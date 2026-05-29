@@ -10,6 +10,7 @@ COPY .claude-plugin/ /usr/share/nginx/html/.claude-plugin/
 COPY .factory-plugin/ /usr/share/nginx/html/.factory-plugin/
 COPY Makefile /usr/share/nginx/html/Makefile
 COPY repo.html /usr/share/nginx/html/repo.html
+COPY admin.html /usr/share/nginx/html/admin.html
 
 COPY start.sh /start.sh
 RUN chmod +x /start.sh

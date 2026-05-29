@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Droid Plugin Marketplace</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --surface-hover: #1a1a1a;
+      --border: #2a2a2a;
+      --text: #e5e5e5;
+      --text-secondary: #888;
+      --accent: #c084fc;
+      --accent-dim: #7c3aed;
+      --green: #4ade80;
+      --red: #f87171;
+      --tag-bg: #1e1b2e;
+      --tag-text: #a78bfa;
+      --blue: #60a5fa;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    /* Top nav */
+    .top-nav {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .top-nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.85rem;
+      transition: color 0.15s;
+    }
+
+    .top-nav a:hover { color: var(--text); }
+    .top-nav a.active { color: var(--accent); }
+
+    /* Header */
+    header {
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    header h1 span { color: var(--accent); }
+
+    header p {
+      color: var(--text-secondary);
+      margin-top: 0.3rem;
+      font-size: 0.9rem;
+    }
+
+    /* Stats bar */
+    .stats-bar {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .stats-bar strong { color: var(--text); }
+
+    .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .btn {
+      font-size: 0.78rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn:hover {
+      border-color: var(--accent-dim);
+      color: var(--text);
+    }
+
+    .btn.accent {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .btn.accent:hover {
+      background: var(--accent);
+    }
+
+    /* Plugin list */
+    .plugin-list {
+      display: grid;
+      gap: 0.6rem;
+    }
+
+    .plugin-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.85rem 1.25rem;
+      transition: border-color 0.15s;
+    }
+
+    .plugin-row.disabled {
+      opacity: 0.45;
+    }
+
+    .plugin-row:hover {
+      border-color: var(--accent-dim);
+    }
+
+    .plugin-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .plugin-info .name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    .plugin-row.disabled .name {
+      text-decoration: line-through;
+      color: var(--text-secondary);
+    }
+
+    .plugin-info .desc {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .plugin-info .tags {
+      display: flex;
+      gap: 0.35rem;
+      margin-top: 0.2rem;
+      flex-wrap: wrap;
+    }
+
+    .plugin-info .tag {
+      font-size: 0.65rem;
+      color: var(--tag-text);
+      background: var(--tag-bg);
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+    }
+
+    /* Toggle switch */
+    .toggle {
+      position: relative;
+      width: 42px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--border);
+      border-radius: 24px;
+      transition: background 0.2s;
+    }
+
+    .toggle .slider::before {
+      content: "";
+      position: absolute;
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background: var(--text-secondary);
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+
+    .toggle input:checked + .slider {
+      background: var(--green);
+    }
+
+    .toggle input:checked + .slider::before {
+      transform: translateX(18px);
+      background: #fff;
+    }
+
+    .status-badge {
+      font-size: 0.7rem;
+      padding: 0.15rem 0.55rem;
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+
+    .status-badge.enabled {
+      background: rgba(74, 222, 128, 0.12);
+      color: var(--green);
+    }
+
+    .status-badge.disabled {
+      background: rgba(248, 113, 113, 0.12);
+      color: var(--red);
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem 0;
+      margin-top: 3rem;
+      border-top: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+    }
+
+    @media (max-width: 600px) {
+      .plugin-row {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+      .plugin-info .desc {
+        white-space: normal;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Top nav -->
+    <nav class="top-nav">
+      <a href="index.html">Marketplace</a>
+      <a href="repo.html">Repository</a>
+      <a href="admin.html" class="active">Admin</a>
+    </nav>
+
+    <header>
+      <h1><span>Admin</span> Panel</h1>
+      <p>Enable or disable plugins. Disabled plugins are hidden from the marketplace and repository views.</p>
+    </header>
+
+    <div class="stats-bar" id="stats-bar"></div>
+
+    <div class="btn-row">
+      <button class="btn accent" onclick="enableAll()">Enable All</button>
+      <button class="btn" onclick="disableAll()">Disable All</button>
+      <button class="btn" onclick="resetToDefaults()">Reset Defaults</button>
+    </div>
+
+    <div class="plugin-list" id="plugin-list"></div>
+
+    <footer>
+      <p>Changes are saved in your browser and apply immediately to all views.</p>
+    </footer>
+  </div>
+
+  <script>
+    const ALL_PLUGINS = [
+      {
+        "name": "code-review",
+        "description": "Automated code review skill that checks for bugs, security issues, performance problems, and style violations",
+        "version": "1.0.0",
+        "category": "development",
+        "tags": ["code-review", "quality", "bugs", "security"]
+      },
+      {
+        "name": "git-companion",
+        "description": "Git workflow skills for writing commit messages and naming branches following conventional standards",
+        "version": "1.0.0",
+        "category": "development",
+        "tags": ["git", "commit", "branch", "workflow", "conventional-commits"]
+      },
+      {
+        "name": "doc-generator",
+        "description": "Generate documentation for functions, classes, modules, and APIs from source code",
+        "version": "1.0.0",
+        "category": "development",
+        "tags": ["documentation", "jsdoc", "docstring", "api-docs"]
+      },
+      {
+        "name": "test-scaffold",
+        "description": "Scaffold unit tests for functions and classes, detecting the project's test framework automatically",
+        "version": "1.0.0",
+        "category": "testing",
+        "tags": ["testing", "unit-test", "scaffold", "jest", "pytest", "vitest"]
+      },
+      {
+        "name": "refactor-helper",
+        "description": "Analyze code and suggest refactoring opportunities to improve structure, reduce duplication, and increase maintainability",
+        "version": "1.0.0",
+        "category": "development",
+        "tags": ["refactoring", "clean-code", "patterns", "maintainability"]
+      }
+    ];
+
+    const STORAGE_KEY = "plugin-marketplace-enabled";
+
+    function getEnabled() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      // Default: all enabled
+      return ALL_PLUGINS.map(p => p.name);
+    }
+
+    function setEnabled(names) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(names));
+    }
+
+    function isEnabled(name) {
+      return getEnabled().includes(name);
+    }
+
+    function render() {
+      const enabled = getEnabled();
+      const count = enabled.length;
+      document.getElementById("stats-bar").innerHTML =
+        `<strong>${count}</strong> of <strong>${ALL_PLUGINS.length}</strong> plugins enabled`;
+
+      document.getElementById("plugin-list").innerHTML = ALL_PLUGINS.map(p => {
+        const on = isEnabled(p.name);
+        return `
+          <div class="plugin-row${on ? "" : " disabled"}">
+            <div class="plugin-info">
+              <div class="name">${p.name} <span style="font-weight:400;font-size:0.75rem;color:var(--text-secondary)">v${p.version}</span></div>
+              <div class="desc">${p.description}</div>
+              <div class="tags">${p.tags.map(t => `<span class="tag">${t}</span>`).join("")}</div>
+            </div>
+            <span class="status-badge ${on ? "enabled" : "disabled"}">${on ? "ENABLED" : "DISABLED"}</span>
+            <label class="toggle">
+              <input type="checkbox" ${on ? "checked" : ""} onchange="togglePlugin('${p.name}', this.checked)">
+              <span class="slider"></span>
+            </label>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function togglePlugin(name, on) {
+      const enabled = getEnabled();
+      if (on) {
+        if (!enabled.includes(name)) enabled.push(name);
+      } else {
+        const idx = enabled.indexOf(name);
+        if (idx !== -1) enabled.splice(idx, 1);
+      }
+      setEnabled(enabled);
+      render();
+    }
+
+    function enableAll() {
+      setEnabled(ALL_PLUGINS.map(p => p.name));
+      render();
+    }
+
+    function disableAll() {
+      setEnabled([]);
+      render();
+    }
+
+    function resetToDefaults() {
+      localStorage.removeItem(STORAGE_KEY);
+      render();
+    }
+
+    render();
+  </script>
+</body>
+</html>

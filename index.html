@@ -36,6 +36,24 @@
       padding: 2rem 1.5rem;
     }
 
+    .top-nav {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .top-nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.85rem;
+      transition: color 0.15s;
+    }
+
+    .top-nav a:hover { color: var(--text); }
+    .top-nav a.active { color: var(--accent); }
+
     header {
       text-align: center;
       padding: 3rem 0 2rem;
@@ -297,6 +315,12 @@
 </head>
 <body>
   <div class="container">
+    <nav class="top-nav">
+      <a href="index.html" class="active">Marketplace</a>
+      <a href="repo.html">Repository</a>
+      <a href="admin.html">Admin</a>
+    </nav>
+
     <header>
       <h1><span>Droid</span> Plugin Marketplace</h1>
       <p>A curated collection of productivity plugins for Claude Code. Add this marketplace to get started.</p>
@@ -397,22 +421,38 @@
       const plugins = MARKETPLACE_DATA.plugins;
       const categories = [...new Set(plugins.map(p => p.category))];
 
+      // Filter by enabled state from localStorage
+      const STORAGE_KEY = "plugin-marketplace-enabled";
+      let enabledNames = null;
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) enabledNames = JSON.parse(raw);
+      } catch (e) {}
+      const visible = enabledNames
+        ? plugins.filter(p => enabledNames.includes(p.name))
+        : plugins;
+      const visibleCategories = [...new Set(visible.map(p => p.category))];
+
       document.getElementById("stats").innerHTML = `
-        <div class="stat"><div class="stat-value">${plugins.length}</div><div class="stat-label">Plugins</div></div>
-        <div class="stat"><div class="stat-value">${categories.length}</div><div class="stat-label">Categories</div></div>
-        <div class="stat"><div class="stat-value">${plugins.reduce((s, p) => s + (p.tags?.length || 0), 0)}</div><div class="stat-label">Tags</div></div>
+        <div class="stat"><div class="stat-value">${visible.length}</div><div class="stat-label">Plugins</div></div>
+        <div class="stat"><div class="stat-value">${visibleCategories.length}</div><div class="stat-label">Categories</div></div>
+        <div class="stat"><div class="stat-value">${visible.reduce((s, p) => s + (p.tags?.length || 0), 0)}</div><div class="stat-label">Tags</div></div>
       `;
 
       const toolbar = document.getElementById("toolbar");
       toolbar.innerHTML = `<button class="active" data-cat="all">All</button>` +
-        categories.map(c => `<button data-cat="${c}">${c}</button>`).join("");
+        visibleCategories.map(c => `<button data-cat="${c}">${c}</button>`).join("");
       toolbar.querySelectorAll("button").forEach(btn => {
-        btn.addEventListener("click", () => filterBy(btn.dataset.cat));
+        btn.addEventListener("click", () => filterBy(btn.dataset.cat, visible));
       });
 
-      renderPlugins(plugins);
+      renderPlugins(visible);
 
-      document.getElementById("json-content").textContent = JSON.stringify(MARKETPLACE_DATA, null, 2);
+      // Build filtered marketplace JSON for raw view
+      const filteredData = enabledNames
+        ? { ...MARKETPLACE_DATA, plugins: MARKETPLACE_DATA.plugins.filter(p => enabledNames.includes(p.name)) }
+        : MARKETPLACE_DATA;
+      document.getElementById("json-content").textContent = JSON.stringify(filteredData, null, 2);
     }
 
     function renderPlugins(plugins) {
@@ -432,13 +472,13 @@
       `).join("");
     }
 
-    function filterBy(cat) {
+    function filterBy(cat, sourcePlugins) {
       document.querySelectorAll(".toolbar button").forEach(b => {
         b.classList.toggle("active", b.dataset.cat === cat);
       });
       const filtered = cat === "all"
-        ? MARKETPLACE_DATA.plugins
-        : MARKETPLACE_DATA.plugins.filter(p => p.category === cat);
+        ? sourcePlugins
+        : sourcePlugins.filter(p => p.category === cat);
       renderPlugins(filtered);
     }
 

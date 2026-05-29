@@ -36,6 +36,24 @@
       padding: 2rem 1.5rem;
     }
 
+    .top-nav {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .top-nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.85rem;
+      transition: color 0.15s;
+    }
+
+    .top-nav a:hover { color: var(--text); }
+    .top-nav a.active { color: var(--accent); }
+
     .breadcrumb {
       display: flex;
       align-items: center;
@@ -261,6 +279,12 @@
 </head>
 <body>
   <div class="container">
+    <nav class="top-nav">
+      <a href="index.html">Marketplace</a>
+      <a href="repo.html" class="active">Repository</a>
+      <a href="admin.html">Admin</a>
+    </nav>
+
     <!-- Breadcrumb -->
     <div class="breadcrumb">
       <a href="index.html">Droid Plugin Marketplace</a>
@@ -290,76 +314,98 @@
   </div>
 
   <script>
-    // File tree — mirrors the git repo structure
-    const TREE = [
-      { name: ".claude-plugin", type: "dir", children: [
-        { name: "marketplace.json", type: "file", ext: "json" }
-      ]},
-      { name: ".factory-plugin", type: "dir", children: [
-        { name: "marketplace.json", type: "file", ext: "json" }
-      ]},
-      { name: "plugins", type: "dir", children: [
-        { name: "code-review", type: "dir", children: [
-          { name: ".claude-plugin", type: "dir", children: [
-            { name: "plugin.json", type: "file", ext: "json" }
-          ]},
-          { name: "skills", type: "dir", children: [
-            { name: "code-review", type: "dir", children: [
-              { name: "SKILL.md", type: "file", ext: "md" }
-            ]}
-          ]}
+    // File tree — mirrors the git repo structure, filtered by admin enabled state
+    const PLUGIN_DIRS = [
+      { name: "code-review", type: "dir", children: [
+        { name: ".claude-plugin", type: "dir", children: [
+          { name: "plugin.json", type: "file", ext: "json" }
         ]},
-        { name: "doc-generator", type: "dir", children: [
-          { name: ".claude-plugin", type: "dir", children: [
-            { name: "plugin.json", type: "file", ext: "json" }
-          ]},
-          { name: "skills", type: "dir", children: [
-            { name: "doc-generator", type: "dir", children: [
-              { name: "SKILL.md", type: "file", ext: "md" }
-            ]}
-          ]}
-        ]},
-        { name: "git-companion", type: "dir", children: [
-          { name: ".claude-plugin", type: "dir", children: [
-            { name: "plugin.json", type: "file", ext: "json" }
-          ]},
-          { name: "skills", type: "dir", children: [
-            { name: "branch-naming", type: "dir", children: [
-              { name: "SKILL.md", type: "file", ext: "md" }
-            ]},
-            { name: "commit-message", type: "dir", children: [
-              { name: "SKILL.md", type: "file", ext: "md" }
-            ]}
-          ]}
-        ]},
-        { name: "refactor-helper", type: "dir", children: [
-          { name: ".claude-plugin", type: "dir", children: [
-            { name: "plugin.json", type: "file", ext: "json" }
-          ]},
-          { name: "skills", type: "dir", children: [
-            { name: "refactor-helper", type: "dir", children: [
-              { name: "SKILL.md", type: "file", ext: "md" }
-            ]}
-          ]}
-        ]},
-        { name: "test-scaffold", type: "dir", children: [
-          { name: ".claude-plugin", type: "dir", children: [
-            { name: "plugin.json", type: "file", ext: "json" }
-          ]},
-          { name: "skills", type: "dir", children: [
-            { name: "test-scaffold", type: "dir", children: [
-              { name: "SKILL.md", type: "file", ext: "md" }
-            ]}
+        { name: "skills", type: "dir", children: [
+          { name: "code-review", type: "dir", children: [
+            { name: "SKILL.md", type: "file", ext: "md" }
           ]}
         ]}
       ]},
-      { name: "Dockerfile", type: "file", ext: "" },
-      { name: "Makefile", type: "file", ext: "" },
-      { name: "index.html", type: "file", ext: "html" },
-      { name: "nginx.conf", type: "file", ext: "conf" },
-      { name: "repo.html", type: "file", ext: "html" },
-      { name: "start.sh", type: "file", ext: "sh" }
+      { name: "doc-generator", type: "dir", children: [
+        { name: ".claude-plugin", type: "dir", children: [
+          { name: "plugin.json", type: "file", ext: "json" }
+        ]},
+        { name: "skills", type: "dir", children: [
+          { name: "doc-generator", type: "dir", children: [
+            { name: "SKILL.md", type: "file", ext: "md" }
+          ]}
+        ]}
+      ]},
+      { name: "git-companion", type: "dir", children: [
+        { name: ".claude-plugin", type: "dir", children: [
+          { name: "plugin.json", type: "file", ext: "json" }
+        ]},
+        { name: "skills", type: "dir", children: [
+          { name: "branch-naming", type: "dir", children: [
+            { name: "SKILL.md", type: "file", ext: "md" }
+          ]},
+          { name: "commit-message", type: "dir", children: [
+            { name: "SKILL.md", type: "file", ext: "md" }
+          ]}
+        ]}
+      ]},
+      { name: "refactor-helper", type: "dir", children: [
+        { name: ".claude-plugin", type: "dir", children: [
+          { name: "plugin.json", type: "file", ext: "json" }
+        ]},
+        { name: "skills", type: "dir", children: [
+          { name: "refactor-helper", type: "dir", children: [
+            { name: "SKILL.md", type: "file", ext: "md" }
+          ]}
+        ]}
+      ]},
+      { name: "test-scaffold", type: "dir", children: [
+        { name: ".claude-plugin", type: "dir", children: [
+          { name: "plugin.json", type: "file", ext: "json" }
+        ]},
+        { name: "skills", type: "dir", children: [
+          { name: "test-scaffold", type: "dir", children: [
+            { name: "SKILL.md", type: "file", ext: "md" }
+          ]}
+        ]}
+      ]}
     ];
+
+    const STORAGE_KEY = "plugin-marketplace-enabled";
+
+    function getEnabledNames() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return null;
+    }
+
+    function buildTree() {
+      const enabled = getEnabledNames();
+      const filteredPlugins = enabled
+        ? PLUGIN_DIRS.filter(p => enabled.includes(p.name))
+        : PLUGIN_DIRS;
+
+      return [
+        { name: ".claude-plugin", type: "dir", children: [
+          { name: "marketplace.json", type: "file", ext: "json" }
+        ]},
+        { name: ".factory-plugin", type: "dir", children: [
+          { name: "marketplace.json", type: "file", ext: "json" }
+        ]},
+        { name: "plugins", type: "dir", children: filteredPlugins },
+        { name: "Dockerfile", type: "file", ext: "" },
+        { name: "Makefile", type: "file", ext: "" },
+        { name: "admin.html", type: "file", ext: "html" },
+        { name: "index.html", type: "file", ext: "html" },
+        { name: "nginx.conf", type: "file", ext: "conf" },
+        { name: "repo.html", type: "file", ext: "html" },
+        { name: "start.sh", type: "file", ext: "sh" }
+      ];
+    }
+
+    const TREE = buildTree();
 
     function iconFor(node) {
       if (node.type === "dir") return "📁";
