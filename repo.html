@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>droid-plugin-marketplace — Repository</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --surface-hover: #1a1a1a;
+      --border: #2a2a2a;
+      --text: #e5e5e5;
+      --text-secondary: #888;
+      --text-tertiary: #555;
+      --accent: #c084fc;
+      --accent-dim: #7c3aed;
+      --blue: #60a5fa;
+      --green: #4ade80;
+      --orange: #f59e0b;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.85rem;
+    }
+
+    .breadcrumb a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    .breadcrumb a:hover { text-decoration: underline; }
+
+    .breadcrumb .sep {
+      color: var(--text-tertiary);
+    }
+
+    .breadcrumb .current {
+      color: var(--text-secondary);
+    }
+
+    /* Repo header — like GitHub's repo bar */
+    .repo-header {
+      border: 1px solid var(--border);
+      border-radius: 8px 8px 0 0;
+      background: var(--surface);
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .repo-icon {
+      font-size: 1.3rem;
+    }
+
+    .repo-name {
+      font-weight: 600;
+      font-size: 1.1rem;
+      color: var(--blue);
+    }
+
+    .repo-name span {
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    .repo-badge {
+      font-size: 0.7rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      background: var(--border);
+      color: var(--text-secondary);
+      margin-left: 0.5rem;
+    }
+
+    .repo-header-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .repo-header-actions a {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.3rem 0.75rem;
+      transition: all 0.15s;
+    }
+
+    .repo-header-actions a:hover {
+      border-color: var(--accent-dim);
+      color: var(--text);
+    }
+
+    /* File list */
+    .file-list {
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      background: var(--surface);
+    }
+
+    .file-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.88rem;
+      cursor: default;
+      transition: background 0.1s;
+    }
+
+    .file-row:last-child {
+      border-bottom: none;
+      border-radius: 0 0 8px 8px;
+    }
+
+    .file-row:hover {
+      background: var(--surface-hover);
+    }
+
+    .file-row.folder {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .file-icon {
+      width: 18px;
+      text-align: center;
+      flex-shrink: 0;
+      font-size: 0.9rem;
+    }
+
+    .file-icon.folder-icon { color: var(--blue); }
+    .file-icon.file-icon-color { color: var(--text-tertiary); }
+    .file-icon.markdown-icon { color: var(--accent); }
+    .file-icon.json-icon { color: var(--orange); }
+
+    .file-name {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-name.folder-name { color: var(--blue); }
+
+    .file-meta {
+      font-size: 0.72rem;
+      color: var(--text-tertiary);
+      flex-shrink: 0;
+    }
+
+    .file-children {
+      display: none;
+    }
+
+    .file-children.open {
+      display: block;
+    }
+
+    .file-children .file-row {
+      padding-left: 2.5rem;
+    }
+
+    .file-children .file-children .file-row {
+      padding-left: 3.75rem;
+    }
+
+    .file-children
+      .file-children
+      .file-children
+      .file-row {
+      padding-left: 5rem;
+    }
+
+    .toggle-arrow {
+      width: 12px;
+      font-size: 0.65rem;
+      color: var(--text-tertiary);
+      transition: transform 0.15s;
+      flex-shrink: 0;
+      text-align: center;
+    }
+
+    .file-row.open .toggle-arrow {
+      transform: rotate(90deg);
+    }
+
+    /* Summary bar */
+    .repo-summary {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-top: 1rem;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .repo-summary strong {
+      color: var(--text);
+    }
+
+    /* Footer */
+    .back-link {
+      display: inline-block;
+      margin-top: 2rem;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.85rem;
+    }
+
+    .back-link:hover { text-decoration: underline; }
+
+    footer {
+      text-align: center;
+      padding: 2rem 0;
+      margin-top: 2rem;
+      border-top: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+    }
+
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 600px) {
+      .repo-header {
+        flex-wrap: wrap;
+      }
+      .repo-header-actions {
+        margin-left: 0;
+        margin-top: 0.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Breadcrumb -->
+    <div class="breadcrumb">
+      <a href="index.html">Droid Plugin Marketplace</a>
+      <span class="sep">/</span>
+      <span class="current">droid-plugin-marketplace</span>
+    </div>
+
+    <!-- Repo header -->
+    <div class="repo-header">
+      <span class="repo-icon">📦</span>
+      <span class="repo-name">droid-plugin-marketplace</span>
+      <span class="repo-badge">Public</span>
+      <div class="repo-header-actions">
+        <a href="index.html">← Marketplace</a>
+      </div>
+    </div>
+
+    <div class="file-list" id="file-list"></div>
+
+    <div class="repo-summary" id="repo-summary"></div>
+
+    <footer>
+      <p>
+        Built for <a href="https://code.claude.com/docs/en/plugin-marketplaces" target="_blank">Claude Code Plugin Marketplace</a>
+      </p>
+    </footer>
+  </div>
+
+  <script>
+    // File tree — mirrors the git repo structure
+    const TREE = [
+      { name: ".claude-plugin", type: "dir", children: [
+        { name: "marketplace.json", type: "file", ext: "json" }
+      ]},
+      { name: ".factory-plugin", type: "dir", children: [
+        { name: "marketplace.json", type: "file", ext: "json" }
+      ]},
+      { name: "plugins", type: "dir", children: [
+        { name: "code-review", type: "dir", children: [
+          { name: ".claude-plugin", type: "dir", children: [
+            { name: "plugin.json", type: "file", ext: "json" }
+          ]},
+          { name: "skills", type: "dir", children: [
+            { name: "code-review", type: "dir", children: [
+              { name: "SKILL.md", type: "file", ext: "md" }
+            ]}
+          ]}
+        ]},
+        { name: "doc-generator", type: "dir", children: [
+          { name: ".claude-plugin", type: "dir", children: [
+            { name: "plugin.json", type: "file", ext: "json" }
+          ]},
+          { name: "skills", type: "dir", children: [
+            { name: "doc-generator", type: "dir", children: [
+              { name: "SKILL.md", type: "file", ext: "md" }
+            ]}
+          ]}
+        ]},
+        { name: "git-companion", type: "dir", children: [
+          { name: ".claude-plugin", type: "dir", children: [
+            { name: "plugin.json", type: "file", ext: "json" }
+          ]},
+          { name: "skills", type: "dir", children: [
+            { name: "branch-naming", type: "dir", children: [
+              { name: "SKILL.md", type: "file", ext: "md" }
+            ]},
+            { name: "commit-message", type: "dir", children: [
+              { name: "SKILL.md", type: "file", ext: "md" }
+            ]}
+          ]}
+        ]},
+        { name: "refactor-helper", type: "dir", children: [
+          { name: ".claude-plugin", type: "dir", children: [
+            { name: "plugin.json", type: "file", ext: "json" }
+          ]},
+          { name: "skills", type: "dir", children: [
+            { name: "refactor-helper", type: "dir", children: [
+              { name: "SKILL.md", type: "file", ext: "md" }
+            ]}
+          ]}
+        ]},
+        { name: "test-scaffold", type: "dir", children: [
+          { name: ".claude-plugin", type: "dir", children: [
+            { name: "plugin.json", type: "file", ext: "json" }
+          ]},
+          { name: "skills", type: "dir", children: [
+            { name: "test-scaffold", type: "dir", children: [
+              { name: "SKILL.md", type: "file", ext: "md" }
+            ]}
+          ]}
+        ]}
+      ]},
+      { name: "Dockerfile", type: "file", ext: "" },
+      { name: "Makefile", type: "file", ext: "" },
+      { name: "index.html", type: "file", ext: "html" },
+      { name: "nginx.conf", type: "file", ext: "conf" },
+      { name: "repo.html", type: "file", ext: "html" },
+      { name: "start.sh", type: "file", ext: "sh" }
+    ];
+
+    function iconFor(node) {
+      if (node.type === "dir") return "📁";
+      const ext = node.ext || "";
+      switch (ext) {
+        case "md": return "📝";
+        case "json": return "⚙️";
+        case "sh": return "🐚";
+        case "html": return "🌐";
+        case "conf": return "🔧";
+        default: return "📄";
+      }
+    }
+
+    function iconClassFor(node) {
+      if (node.type === "dir") return "folder-icon";
+      switch (node.ext) {
+        case "md": return "markdown-icon";
+        case "json": return "json-icon";
+        default: return "file-icon-color";
+      }
+    }
+
+    function countItems(tree) {
+      let dirs = 0, files = 0;
+      function walk(nodes) {
+        for (const n of nodes) {
+          if (n.type === "dir") { dirs++; walk(n.children || []); }
+          else files++;
+        }
+      }
+      walk(tree);
+      return { dirs, files };
+    }
+
+    function renderTree(nodes, level) {
+      return nodes.map(n => {
+        if (n.type === "dir") {
+          const id = "dir-" + Math.random().toString(36).slice(2, 8);
+          return `
+            <div class="file-row folder" data-dir-id="${id}" onclick="toggleDir('${id}')">
+              <span class="toggle-arrow">▶</span>
+              <span class="file-icon ${iconClassFor(n)}">${iconFor(n)}</span>
+              <span class="file-name folder-name">${n.name}</span>
+            </div>
+            <div class="file-children" id="${id}">
+              ${renderTree(n.children || [], level + 1)}
+            </div>
+          `;
+        }
+        return `
+          <div class="file-row">
+            <span class="toggle-arrow" style="visibility:hidden">▶</span>
+            <span class="file-icon ${iconClassFor(n)}">${iconFor(n)}</span>
+            <span class="file-name">${n.name}</span>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function toggleDir(id) {
+      const children = document.getElementById(id);
+      const row = document.querySelector(`[data-dir-id="${id}"]`);
+      if (!children || !row) return;
+      children.classList.toggle("open");
+      row.classList.toggle("open");
+    }
+
+    // Render
+    document.getElementById("file-list").innerHTML = renderTree(TREE, 0);
+
+    const { dirs, files } = countItems(TREE);
+    document.getElementById("repo-summary").innerHTML =
+      `<strong>${dirs}</strong> directories · <strong>${files}</strong> files`;
+  </script>
+</body>
+</html>
