@@ -1,0 +1,10 @@
+{
+  "name": "git-companion",
+  "description": "Git workflow skills for writing commit messages and naming branches following conventional standards",
+  "version": "1.0.0",
+  "author": {
+    "name": "Droid Plugin Marketplace"
+  },
+  "license": "MIT",
+  "keywords": ["git", "commit", "branch", "workflow", "conventional-commits"]
+}

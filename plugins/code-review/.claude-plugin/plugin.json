@@ -1,0 +1,10 @@
+{
+  "name": "code-review",
+  "description": "Automated code review skill that checks for bugs, security issues, performance problems, and style violations",
+  "version": "1.0.0",
+  "author": {
+    "name": "Droid Plugin Marketplace"
+  },
+  "license": "MIT",
+  "keywords": ["code-review", "quality", "bugs", "security"]
+}

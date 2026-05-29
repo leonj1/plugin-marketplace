@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Droid Plugin Marketplace</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --surface-hover: #1a1a1a;
+      --border: #2a2a2a;
+      --text: #e5e5e5;
+      --text-secondary: #888;
+      --accent: #c084fc;
+      --accent-dim: #7c3aed;
+      --tag-bg: #1e1b2e;
+      --tag-text: #a78bfa;
+      --green: #4ade80;
+      --blue: #60a5fa;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    header {
+      text-align: center;
+      padding: 3rem 0 2rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+    }
+
+    header h1 span { color: var(--accent); }
+
+    header p {
+      color: var(--text-secondary);
+      max-width: 600px;
+      margin: 0 auto 1.5rem;
+    }
+
+    .install-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .install-bar code {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 1rem;
+      font-family: "SF Mono", "Fira Code", "Fira Mono", monospace;
+      font-size: 0.85rem;
+      color: var(--green);
+      user-select: all;
+    }
+
+    .copy-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.15s;
+    }
+
+    .copy-btn:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .toolbar button {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.4rem 0.85rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.15s;
+    }
+
+    .toolbar button:hover,
+    .toolbar button.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .plugin-grid {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .plugin-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      transition: border-color 0.15s;
+    }
+
+    .plugin-card:hover {
+      border-color: var(--accent-dim);
+    }
+
+    .plugin-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .plugin-name {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .plugin-version {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      background: var(--bg);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+
+    .plugin-desc {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .plugin-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .plugin-category {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--blue);
+      background: rgba(96, 165, 250, 0.1);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+    }
+
+    .tag {
+      font-size: 0.7rem;
+      color: var(--tag-text);
+      background: var(--tag-bg);
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+    }
+
+    .plugin-install {
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: var(--green);
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+      user-select: all;
+    }
+
+    .json-toggle {
+      text-align: center;
+      margin-top: 2rem;
+    }
+
+    .json-toggle button {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 1.5rem;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.15s;
+    }
+
+    .json-toggle button:hover {
+      background: var(--accent-dim);
+      color: #fff;
+    }
+
+    .json-panel {
+      display: none;
+      margin-top: 1.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .json-panel.visible { display: block; }
+
+    .json-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+
+    .json-panel-header span {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .json-panel pre {
+      padding: 1rem;
+      overflow-x: auto;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: var(--text);
+    }
+
+    .stats {
+      display: flex;
+      gap: 2rem;
+      justify-content: center;
+      margin-bottom: 2rem;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem 0;
+      margin-top: 3rem;
+      border-top: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+    }
+
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.5rem; }
+      .stats { gap: 1rem; }
+      .stat-value { font-size: 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1><span>Droid</span> Plugin Marketplace</h1>
+      <p>A curated collection of productivity plugins for Claude Code. Add this marketplace to get started.</p>
+      <div class="install-bar">
+        <code id="install-cmd">/plugin marketplace add owner/droid-plugin-marketplace</code>
+        <button class="copy-btn" onclick="copyInstall()">Copy</button>
+      </div>
+    </header>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="toolbar" id="toolbar"></div>
+
+    <div class="plugin-grid" id="plugin-grid"></div>
+
+    <div class="json-toggle">
+      <button onclick="toggleJson()">View Raw marketplace.json</button>
+    </div>
+
+    <div class="json-panel" id="json-panel">
+      <div class="json-panel-header">
+        <span>.claude-plugin/marketplace.json</span>
+        <button class="copy-btn" onclick="copyJson()">Copy JSON</button>
+      </div>
+      <pre id="json-content"></pre>
+    </div>
+
+    <footer>
+      <p>
+        Built for <a href="https://code.claude.com/docs/en/plugin-marketplaces" target="_blank">Claude Code Plugin Marketplace</a>
+      </p>
+    </footer>
+  </div>
+
+  <script>
+    const MARKETPLACE_DATA = {
+      "name": "droid-plugin-marketplace",
+      "description": "A curated collection of productivity plugins for Claude Code, including code review, git workflows, documentation generation, test scaffolding, and refactoring tools",
+      "owner": {
+        "name": "Droid Plugin Marketplace"
+      },
+      "plugins": [
+        {
+          "name": "code-review",
+          "source": "./plugins/code-review",
+          "description": "Automated code review skill that checks for bugs, security issues, performance problems, and style violations",
+          "version": "1.0.0",
+          "author": { "name": "Droid Plugin Marketplace" },
+          "category": "development",
+          "tags": ["code-review", "quality", "bugs", "security"],
+          "license": "MIT"
+        },
+        {
+          "name": "git-companion",
+          "source": "./plugins/git-companion",
+          "description": "Git workflow skills for writing commit messages and naming branches following conventional standards",
+          "version": "1.0.0",
+          "author": { "name": "Droid Plugin Marketplace" },
+          "category": "development",
+          "tags": ["git", "commit", "branch", "workflow", "conventional-commits"],
+          "license": "MIT"
+        },
+        {
+          "name": "doc-generator",
+          "source": "./plugins/doc-generator",
+          "description": "Generate documentation for functions, classes, modules, and APIs from source code",
+          "version": "1.0.0",
+          "author": { "name": "Droid Plugin Marketplace" },
+          "category": "development",
+          "tags": ["documentation", "jsdoc", "docstring", "api-docs"],
+          "license": "MIT"
+        },
+        {
+          "name": "test-scaffold",
+          "source": "./plugins/test-scaffold",
+          "description": "Scaffold unit tests for functions and classes, detecting the project's test framework automatically",
+          "version": "1.0.0",
+          "author": { "name": "Droid Plugin Marketplace" },
+          "category": "testing",
+          "tags": ["testing", "unit-test", "scaffold", "jest", "pytest", "vitest"],
+          "license": "MIT"
+        },
+        {
+          "name": "refactor-helper",
+          "source": "./plugins/refactor-helper",
+          "description": "Analyze code and suggest refactoring opportunities to improve structure, reduce duplication, and increase maintainability",
+          "version": "1.0.0",
+          "author": { "name": "Droid Plugin Marketplace" },
+          "category": "development",
+          "tags": ["refactoring", "clean-code", "patterns", "maintainability"],
+          "license": "MIT"
+        }
+      ]
+    };
+
+    function render() {
+      const plugins = MARKETPLACE_DATA.plugins;
+      const categories = [...new Set(plugins.map(p => p.category))];
+
+      document.getElementById("stats").innerHTML = `
+        <div class="stat"><div class="stat-value">${plugins.length}</div><div class="stat-label">Plugins</div></div>
+        <div class="stat"><div class="stat-value">${categories.length}</div><div class="stat-label">Categories</div></div>
+        <div class="stat"><div class="stat-value">${plugins.reduce((s, p) => s + (p.tags?.length || 0), 0)}</div><div class="stat-label">Tags</div></div>
+      `;
+
+      const toolbar = document.getElementById("toolbar");
+      toolbar.innerHTML = `<button class="active" data-cat="all">All</button>` +
+        categories.map(c => `<button data-cat="${c}">${c}</button>`).join("");
+      toolbar.querySelectorAll("button").forEach(btn => {
+        btn.addEventListener("click", () => filterBy(btn.dataset.cat));
+      });
+
+      renderPlugins(plugins);
+
+      document.getElementById("json-content").textContent = JSON.stringify(MARKETPLACE_DATA, null, 2);
+    }
+
+    function renderPlugins(plugins) {
+      document.getElementById("plugin-grid").innerHTML = plugins.map(p => `
+        <div class="plugin-card">
+          <div class="plugin-header">
+            <span class="plugin-name">${p.name}</span>
+            <span class="plugin-version">v${p.version}</span>
+          </div>
+          <div class="plugin-desc">${p.description}</div>
+          <div class="plugin-meta">
+            <span class="plugin-category">${p.category}</span>
+            ${(p.tags || []).map(t => `<span class="tag">${t}</span>`).join("")}
+          </div>
+          <div class="plugin-install">/plugin install ${p.name}@${MARKETPLACE_DATA.name}</div>
+        </div>
+      `).join("");
+    }
+
+    function filterBy(cat) {
+      document.querySelectorAll(".toolbar button").forEach(b => {
+        b.classList.toggle("active", b.dataset.cat === cat);
+      });
+      const filtered = cat === "all"
+        ? MARKETPLACE_DATA.plugins
+        : MARKETPLACE_DATA.plugins.filter(p => p.category === cat);
+      renderPlugins(filtered);
+    }
+
+    function toggleJson() {
+      document.getElementById("json-panel").classList.toggle("visible");
+    }
+
+    function copyInstall() {
+      navigator.clipboard.writeText(document.getElementById("install-cmd").textContent);
+    }
+
+    function copyJson() {
+      navigator.clipboard.writeText(JSON.stringify(MARKETPLACE_DATA, null, 2));
+    }
+
+    render();
+  </script>
+</body>
+</html>

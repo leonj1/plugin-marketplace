@@ -1,0 +1,10 @@
+{
+  "name": "doc-generator",
+  "description": "Generate documentation for functions, classes, modules, and APIs from source code",
+  "version": "1.0.0",
+  "author": {
+    "name": "Droid Plugin Marketplace"
+  },
+  "license": "MIT",
+  "keywords": ["documentation", "jsdoc", "docstring", "api-docs"]
+}

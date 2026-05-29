@@ -1,0 +1,10 @@
+{
+  "name": "test-scaffold",
+  "description": "Scaffold unit tests for functions and classes, detecting the project's test framework automatically",
+  "version": "1.0.0",
+  "author": {
+    "name": "Droid Plugin Marketplace"
+  },
+  "license": "MIT",
+  "keywords": ["testing", "unit-test", "scaffold", "jest", "pytest", "vitest"]
+}

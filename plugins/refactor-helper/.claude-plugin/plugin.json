@@ -1,0 +1,10 @@
+{
+  "name": "refactor-helper",
+  "description": "Analyze code and suggest refactoring opportunities to improve structure, reduce duplication, and increase maintainability",
+  "version": "1.0.0",
+  "author": {
+    "name": "Droid Plugin Marketplace"
+  },
+  "license": "MIT",
+  "keywords": ["refactoring", "clean-code", "patterns", "maintainability"]
+}
