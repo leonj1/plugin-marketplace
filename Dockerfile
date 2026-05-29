@@ -1,6 +1,8 @@
-FROM nginx:alpine
+FROM nginx:stable
 
-RUN apk add --no-cache git fcgiwrap spawn-fcgi
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git fcgiwrap spawn-fcgi \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY nginx.conf /etc/nginx/nginx.conf
 

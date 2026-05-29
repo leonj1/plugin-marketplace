@@ -25,11 +25,16 @@ if [ ! -d "$GIT_DIR" ]; then
     # Generate dumb-HTTP info files (fallback)
     cd "$GIT_DIR"
     git update-server-info
+    # Mark repo as exportable for git-http-backend (belt-and-braces)
+    touch "$GIT_DIR/git-daemon-export-ok"
 fi
+
+# Ensure the nginx/fcgiwrap user can read the repo regardless of who created it
+chown -R nginx:nginx /var/lib/git
 
 # Start fcgiwrap
 echo "Starting fcgiwrap..."
-spawn-fcgi -s /var/run/fcgiwrap.socket -M 766 -u nginx -g nginx /usr/bin/fcgiwrap
+spawn-fcgi -s /var/run/fcgiwrap.socket -M 766 -u nginx -g nginx /usr/sbin/fcgiwrap
 sleep 0.5
 chmod 766 /var/run/fcgiwrap.socket
 

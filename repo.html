@@ -133,6 +133,51 @@
       color: var(--text);
     }
 
+    /* Clone note */
+    .repo-clone-note {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: none;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .repo-clone-note .clone-label {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .repo-clone-note code {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.35rem 0.75rem;
+      font-family: "SF Mono", "Fira Code", "Fira Mono", monospace;
+      font-size: 0.78rem;
+      color: var(--green);
+      user-select: all;
+      word-break: break-all;
+    }
+
+    .repo-clone-note .copy-btn {
+      font-size: 0.75rem;
+      padding: 0.3rem 0.7rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .repo-clone-note .copy-btn:hover {
+      border-color: var(--accent-dim);
+      color: var(--text);
+    }
+
     /* File list */
     .file-list {
       border: 1px solid var(--border);
@@ -300,6 +345,12 @@
       <div class="repo-header-actions">
         <a href="index.html">← Marketplace</a>
       </div>
+    </div>
+
+    <div class="repo-clone-note">
+      <span class="clone-label">Clone or add this marketplace:</span>
+      <code id="clone-url">http://localhost:8081/droid/v1/marketplace.git</code>
+      <button class="copy-btn" onclick="copyCloneUrl()">Copy</button>
     </div>
 
     <div class="file-list" id="file-list"></div>
@@ -473,6 +524,26 @@
       children.classList.toggle("open");
       row.classList.toggle("open");
     }
+
+    // Set clone URL to match actual host
+    const cloneUrl = window.location.origin + "/droid/v1/marketplace.git";
+    const cloneEl = document.getElementById("clone-url");
+    if (cloneEl) cloneEl.textContent = cloneUrl;
+
+    window.copyCloneUrl = function() {
+      const el = document.getElementById("clone-url");
+      if (!el) return;
+      navigator.clipboard.writeText(el.textContent).catch(() => {
+        // Fallback for older browsers / non-secure contexts
+        const ta = document.createElement("textarea");
+        ta.value = el.textContent;
+        ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      });
+    };
 
     // Render
     document.getElementById("file-list").innerHTML = renderTree(TREE, 0);

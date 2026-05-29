@@ -2,7 +2,7 @@ PORT := 8081
 IMAGE := droid-plugin-marketplace
 CONTAINER := droid-plugin-marketplace
 
-.PHONY: build start stop restart status
+.PHONY: build start stop restart status test
 
 build:
 	docker build -t $(IMAGE) .
@@ -16,9 +16,8 @@ start:
 	fi
 
 stop:
-	@if docker ps --format '{{.Names}}' | grep -q '^$(CONTAINER)$$'; then \
-		docker stop $(CONTAINER) && docker rm $(CONTAINER); \
-		echo "Server stopped"; \
+	@if docker ps -a --format '{{.Names}}' | grep -q '^$(CONTAINER)$$'; then \
+		docker rm -f $(CONTAINER) >/dev/null && echo "Server stopped"; \
 	else \
 		echo "Server is not running"; \
 	fi
@@ -31,3 +30,6 @@ status:
 	else \
 		echo "Server is not running"; \
 	fi
+
+test:
+	@MARKETPLACE_URL=http://localhost:$(PORT) bash test-clone.sh
