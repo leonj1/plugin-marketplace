@@ -1,30 +1,33 @@
-PORT := 36287
-PIDFILE := .server.pid
+PORT := 8081
+IMAGE := droid-plugin-marketplace
+CONTAINER := droid-plugin-marketplace
 
-.PHONY: start stop status
+.PHONY: build start stop restart status
+
+build:
+	docker build -t $(IMAGE) .
 
 start:
-	@if [ -f $(PIDFILE) ] && kill -0 $$(cat $(PIDFILE)) 2>/dev/null; then \
-		echo "Server already running on port $(PORT) (pid $$(cat $(PIDFILE)))"; \
+	@if docker ps --format '{{.Names}}' | grep -q '^$(CONTAINER)$$'; then \
+		echo "Container already running on http://localhost:$(PORT)"; \
 	else \
-		python3 -m http.server $(PORT) &>/dev/null & \
-		echo $$! > $(PIDFILE); \
-		echo "Server started on http://localhost:$(PORT) (pid $$!)"; \
+		docker run -d --name $(CONTAINER) -p $(PORT):80 $(IMAGE); \
+		echo "Server started on http://localhost:$(PORT)"; \
 	fi
 
 stop:
-	@if [ -f $(PIDFILE) ] && kill -0 $$(cat $(PIDFILE)) 2>/dev/null; then \
-		kill $$(cat $(PIDFILE)); \
-		rm -f $(PIDFILE); \
+	@if docker ps --format '{{.Names}}' | grep -q '^$(CONTAINER)$$'; then \
+		docker stop $(CONTAINER) && docker rm $(CONTAINER); \
 		echo "Server stopped"; \
 	else \
-		rm -f $(PIDFILE); \
 		echo "Server is not running"; \
 	fi
 
+restart: stop start
+
 status:
-	@if [ -f $(PIDFILE) ] && kill -0 $$(cat $(PIDFILE)) 2>/dev/null; then \
-		echo "Server running on http://localhost:$(PORT) (pid $$(cat $(PIDFILE)))"; \
+	@if docker ps --format '{{.Names}}' | grep -q '^$(CONTAINER)$$'; then \
+		echo "Server running on http://localhost:$(PORT)"; \
 	else \
 		echo "Server is not running"; \
 	fi
