@@ -1,14 +1,14 @@
-# Droid Plugin Marketplace
+# Plugin Marketplace
 
 A self-hostable plugin marketplace that serves the **same catalog** to both
-**Claude Code** (via static `marketplace.json`) and **Droid CLI** (via a Smart-HTTP
+**Claude Code** (via static `marketplace.json`) and **Factory CLI** (via a Smart-HTTP
 git endpoint) from a single nginx + git-http-backend container.
 
 | What you get | How it's served |
 |---|---|
 | 5 productivity plugins (code-review, git-companion, doc-generator, test-scaffold, refactor-helper) | `plugins/<name>/.claude-plugin/plugin.json` + `SKILL.md` files |
 | Claude Code marketplace | `GET /.claude-plugin/marketplace.json` (static) |
-| Droid CLI marketplace | `git clone http://<host>/droid/v1/marketplace.git` (Smart-HTTP) |
+| Factory CLI marketplace | `git clone http://<host>/droid/v1/marketplace.git` (Smart-HTTP) |
 | Browser UI | `/index.html`, `/repo.html`, `/admin.html` |
 
 ## Screenshots
@@ -94,7 +94,7 @@ In `~/.claude/settings.json` (path may vary by platform):
 {
   "marketplaces": [
     {
-      "name": "droid-plugin-marketplace",
+      "name": "plugin-marketplace",
       "url": "http://localhost:8081/.claude-plugin/marketplace.json"
     }
   ]
@@ -104,38 +104,38 @@ In `~/.claude/settings.json` (path may vary by platform):
 After Claude Code reloads, the five plugins appear in the marketplace UI and
 can be installed individually.
 
-### Droid CLI (Factory)
+### Factory CLI
 
-Droid CLI consumes the marketplace by **cloning a git repository** that
-contains a `.factory-plugin/marketplace.json` at its root. Point Droid at the
+Factory CLI consumes the marketplace by **cloning a git repository** that
+contains a `.factory-plugin/marketplace.json` at its root. Point Factory CLI at the
 Smart-HTTP URL exposed by this container:
 
 ```
 http://localhost:8081/droid/v1/marketplace.git
 ```
 
-Verify it works without Droid first:
+Verify it works without Factory CLI first:
 
 ```bash
 git clone http://localhost:8081/droid/v1/marketplace.git
 ls marketplace/.factory-plugin/marketplace.json
 ```
 
-Then add the marketplace to Droid (`~/.factory/config.json` or via
+Then add the marketplace (`~/.factory/config.json` or via
 `droid marketplace add`, depending on your version):
 
 ```json
 {
   "marketplaces": [
     {
-      "name": "droid-plugin-marketplace",
+      "name": "plugin-marketplace",
       "git": "http://localhost:8081/droid/v1/marketplace.git"
     }
   ]
 }
 ```
 
-Droid will `git clone` (and later `git pull`) this URL, parse
+Factory CLI will `git clone` (and later `git pull`) this URL, parse
 `.factory-plugin/marketplace.json`, and surface the plugins listed there.
 
 ### Same catalog, two formats
