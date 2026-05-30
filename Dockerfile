@@ -12,6 +12,7 @@ COPY index.html /usr/share/nginx/html/index.html
 COPY plugins/ /usr/share/nginx/html/plugins/
 COPY .claude-plugin/ /usr/share/nginx/html/.claude-plugin/
 COPY .factory-plugin/ /usr/share/nginx/html/.factory-plugin/
+COPY .agents/ /usr/share/nginx/html/.agents/
 COPY Makefile /usr/share/nginx/html/Makefile
 COPY repo.html /usr/share/nginx/html/repo.html
 COPY admin.html /usr/share/nginx/html/admin.html

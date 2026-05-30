@@ -13,6 +13,7 @@ if [ ! -d "$GIT_DIR" ]; then
     cp -a /usr/share/nginx/html/* "$tmp/"
     cp -a /usr/share/nginx/html/.factory-plugin "$tmp/"
     cp -a /usr/share/nginx/html/.claude-plugin "$tmp/"
+    cp -a /usr/share/nginx/html/.agents "$tmp/"
     cd "$tmp"
     git init
     git config user.email "marketplace@droid.local"

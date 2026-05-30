@@ -52,6 +52,15 @@ WEB_ROOT       = os.environ.get("WEB_ROOT",       "/usr/share/nginx/html")
 PLUGINS_DIR    = os.path.join(WEB_ROOT, "plugins")
 CLAUDE_MARKET  = os.path.join(WEB_ROOT, ".claude-plugin", "marketplace.json")
 FACTORY_MARKET = os.path.join(WEB_ROOT, ".factory-plugin", "marketplace.json")
+AGENTS_MARKET  = os.path.join(WEB_ROOT, ".agents", "plugins", "marketplace.json")
+
+# Every marketplace JSON file kept in sync. Each entry is the path relative
+# to the repository root that contains the file.
+MARKETPLACE_FILES = (
+    ".claude-plugin/marketplace.json",
+    ".factory-plugin/marketplace.json",
+    ".agents/plugins/marketplace.json",
+)
 
 GIT_DIR        = os.environ.get("GIT_DIR",        "/var/lib/git/droid/v1/marketplace.git")
 STATE_DIR      = os.environ.get("STATE_DIR",      "/var/lib/marketplace")
@@ -424,7 +433,7 @@ def update_marketplaces(work, externals):
 
     Built-in entries are preserved verbatim; we only rewrite/remove entries
     that carry an `external` block (added by us)."""
-    for relpath in (".claude-plugin/marketplace.json", ".factory-plugin/marketplace.json"):
+    for relpath in MARKETPLACE_FILES:
         abs_path = os.path.join(work, relpath)
         if not os.path.exists(abs_path):
             log(f"marketplace.json missing in working copy: {relpath}")
@@ -449,6 +458,29 @@ def _safe_plugin_name(raw):
     """Allow only filename-safe characters; collapse the rest."""
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", raw or "").strip("-.")
     return cleaned or "plugin"
+
+
+def _ensure_agents_manifest(plugin_dir, name, repo, commit, path=""):
+    """Create .agents/marketplace.json inside a plugin directory so the
+    plugin is discoverable via the agents protocol."""
+    agents_dir = os.path.join(plugin_dir, ".agents")
+    os.makedirs(agents_dir, exist_ok=True)
+    manifest = {
+        "name":        name,
+        "source":      f"./plugins/{name}",
+        "description": f"External plugin from {repo}",
+        "version":     commit[:7],
+        "author":      {"name": repo.split("/")[0]},
+        "external": {
+            "repo":   repo,
+            "commit": commit,
+            "path":   path or "",
+        },
+    }
+    manifest_path = os.path.join(agents_dir, "marketplace.json")
+    with open(manifest_path, "w") as f:
+        json.dump(manifest, f, indent=2)
+        f.write("\n")
 
 
 def add_external(url, sha_input):
@@ -495,6 +527,10 @@ def add_external(url, sha_input):
             staging = os.path.join(tmp, "staged-" + name)
             shutil.copytree(src, staging)
 
+            # Ensure the plugin directory contains .agents/marketplace.json
+            # so it is visible under plugins/<name> in the repo view.
+            _ensure_agents_manifest(staging, name, repo, commit, subpath)
+
             # --- Clone bare repo, sync files, commit, push ---
             work = os.path.join(tmp, "work")
             _clone_working_copy(work)
@@ -532,6 +568,8 @@ def add_external(url, sha_input):
             # Sync marketplace.json files from working copy to nginx root.
             shutil.copyfile(os.path.join(work, ".claude-plugin",  "marketplace.json"), CLAUDE_MARKET)
             shutil.copyfile(os.path.join(work, ".factory-plugin", "marketplace.json"), FACTORY_MARKET)
+            os.makedirs(os.path.dirname(AGENTS_MARKET), exist_ok=True)
+            shutil.copyfile(os.path.join(work, ".agents", "plugins", "marketplace.json"), AGENTS_MARKET)
 
             # --- Persist registry ---
             save_externals(new_externals)
@@ -567,6 +605,8 @@ def remove_external(plugin_id):
                 shutil.rmtree(static_target)
             shutil.copyfile(os.path.join(work, ".claude-plugin",  "marketplace.json"), CLAUDE_MARKET)
             shutil.copyfile(os.path.join(work, ".factory-plugin", "marketplace.json"), FACTORY_MARKET)
+            os.makedirs(os.path.dirname(AGENTS_MARKET), exist_ok=True)
+            shutil.copyfile(os.path.join(work, ".agents", "plugins", "marketplace.json"), AGENTS_MARKET)
 
             save_externals(new_externals)
         finally:
@@ -663,17 +703,21 @@ class IngestHandler(BaseHTTPRequestHandler):
 def backfill_trees():
     """Older registry entries lacked a `tree` field. On startup, walk the
     on-disk plugin folder of every external and populate it so repo.html
-    can render it as an expandable folder without re-ingesting."""
+    can render it as an expandable folder without re-ingesting.
+    Also ensures each external plugin has .agents/marketplace.json."""
     externals = load_externals()
     changed = False
     for ext in externals:
-        if ext.get("tree"):
-            continue
         plugin_dir = os.path.join(PLUGINS_DIR, ext["name"])
         if os.path.isdir(plugin_dir):
-            ext["tree"] = walk_tree(plugin_dir)
-            changed = True
-            log(f"backfilled tree for external {ext['name']}")
+            _ensure_agents_manifest(
+                plugin_dir, ext["name"], ext["repo"],
+                ext["commit"], ext.get("path", ""),
+            )
+            if not ext.get("tree"):
+                ext["tree"] = walk_tree(plugin_dir)
+                changed = True
+                log(f"backfilled tree for external {ext['name']}")
     if changed:
         save_externals(externals)
 

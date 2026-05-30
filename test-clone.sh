@@ -52,6 +52,7 @@ info "4/5  Cloned content sanity checks"
 declare -a EXPECTED=(
     ".claude-plugin/marketplace.json"
     ".factory-plugin/marketplace.json"
+    ".agents/plugins/marketplace.json"
     "plugins"
 )
 for path in "${EXPECTED[@]}"; do
@@ -64,7 +65,8 @@ done
 # Validate the JSON files parse
 for json in \
     "$CLONE_DIR/.claude-plugin/marketplace.json" \
-    "$CLONE_DIR/.factory-plugin/marketplace.json"; do
+    "$CLONE_DIR/.factory-plugin/marketplace.json" \
+    "$CLONE_DIR/.agents/plugins/marketplace.json"; do
     if command -v python3 >/dev/null 2>&1; then
         if ! python3 -c "import json,sys; json.load(open('$json'))"; then
             fail "Invalid JSON: $json"
@@ -74,7 +76,7 @@ for json in \
 done
 
 info "5/5  Static marketplace.json endpoints (Claude Code plugin path)"
-for path in /.claude-plugin/marketplace.json /.factory-plugin/marketplace.json; do
+for path in /.claude-plugin/marketplace.json /.factory-plugin/marketplace.json /.agents/plugins/marketplace.json; do
     if ! curl -fsS "$BASE_URL$path" | head -c 1 >/dev/null; then
         fail "Static endpoint not serving: $path"
     fi
