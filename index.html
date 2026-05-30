@@ -38,6 +38,7 @@
 
     .top-nav {
       display: flex;
+      align-items: center;
       gap: 1.5rem;
       margin-bottom: 2rem;
       padding-bottom: 1rem;
@@ -53,6 +54,26 @@
 
     .top-nav a:hover { color: var(--text); }
     .top-nav a.active { color: var(--accent); }
+
+    .top-nav .nav-stats {
+      margin-left: auto;
+      display: flex;
+      gap: 1.25rem;
+    }
+    .top-nav .nav-stat {
+      display: flex;
+      align-items: baseline;
+      gap: 0.35rem;
+      font-size: 0.85rem;
+    }
+    .top-nav .nav-stat-value {
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .top-nav .nav-stat-label {
+      color: var(--text-secondary);
+      text-transform: lowercase;
+    }
 
     header {
       text-align: center;
@@ -272,28 +293,6 @@
       color: var(--text);
     }
 
-    .stats {
-      display: flex;
-      gap: 2rem;
-      justify-content: center;
-      margin-bottom: 2rem;
-    }
-
-    .stat {
-      text-align: center;
-    }
-
-    .stat-value {
-      font-size: 1.75rem;
-      font-weight: 700;
-      color: var(--accent);
-    }
-
-    .stat-label {
-      font-size: 0.8rem;
-      color: var(--text-secondary);
-    }
-
     footer {
       text-align: center;
       padding: 2rem 0;
@@ -308,8 +307,9 @@
 
     @media (max-width: 600px) {
       header h1 { font-size: 1.5rem; }
-      .stats { gap: 1rem; }
-      .stat-value { font-size: 1.3rem; }
+      .top-nav { flex-wrap: wrap; gap: 1rem; }
+      .top-nav .nav-stats { margin-left: 0; gap: 0.9rem; width: 100%; justify-content: flex-start; }
+      .top-nav .nav-stat { font-size: 0.8rem; }
     }
   </style>
 </head>
@@ -319,6 +319,7 @@
       <a href="index.html" class="active">Marketplace</a>
       <a href="repo.html">Repository</a>
       <a href="admin.html">Admin</a>
+      <div class="nav-stats" id="stats"></div>
     </nav>
 
     <header>
@@ -329,8 +330,6 @@
         <button class="copy-btn" onclick="copyInstall()">Copy</button>
       </div>
     </header>
-
-    <div class="stats" id="stats"></div>
 
     <div class="toolbar" id="toolbar"></div>
 
@@ -487,10 +486,11 @@
       const visible = plugins.filter(isVisible);
       const visibleCategories = [...new Set(visible.map(p => p.category))];
 
+      const tagCount = visible.reduce((s, p) => s + (p.tags?.length || 0), 0);
       document.getElementById("stats").innerHTML = `
-        <div class="stat"><div class="stat-value">${visible.length}</div><div class="stat-label">Plugins</div></div>
-        <div class="stat"><div class="stat-value">${visibleCategories.length}</div><div class="stat-label">Categories</div></div>
-        <div class="stat"><div class="stat-value">${visible.reduce((s, p) => s + (p.tags?.length || 0), 0)}</div><div class="stat-label">Tags</div></div>
+        <div class="nav-stat"><span class="nav-stat-value">${visible.length}</span><span class="nav-stat-label">plugins</span></div>
+        <div class="nav-stat"><span class="nav-stat-value">${visibleCategories.length}</span><span class="nav-stat-label">categories</span></div>
+        <div class="nav-stat"><span class="nav-stat-value">${tagCount}</span><span class="nav-stat-label">tags</span></div>
       `;
 
       const toolbar = document.getElementById("toolbar");
