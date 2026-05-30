@@ -93,17 +93,9 @@
       margin-bottom: 1.5rem;
     }
 
-    /* Add-external form */
-    .add-external {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1rem 1.25rem;
-      margin-bottom: 1.5rem;
-    }
-
+    /* Add-external form (rendered inside the modal) */
     .add-external h2 {
-      font-size: 0.95rem;
+      font-size: 1.05rem;
       font-weight: 600;
       margin-bottom: 0.3rem;
     }
@@ -152,6 +144,67 @@
     .form-status.error   { color: var(--red); }
     .form-status.success { color: var(--green); }
     .form-status.info    { color: var(--text-secondary); }
+
+    /* Modal */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+      animation: modal-fade 0.15s ease-out;
+    }
+
+    .modal[hidden] { display: none; }
+
+    @keyframes modal-fade {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    .modal-dialog {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      width: 100%;
+      max-width: 560px;
+      max-height: 90vh;
+      overflow: auto;
+      padding: 1.25rem 1.4rem;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+      position: relative;
+      animation: modal-pop 0.15s ease-out;
+    }
+
+    @keyframes modal-pop {
+      from { transform: translateY(8px); opacity: 0; }
+      to   { transform: translateY(0);   opacity: 1; }
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 0.6rem;
+      right: 0.75rem;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 1.3rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0.25rem 0.45rem;
+      border-radius: 4px;
+      transition: all 0.15s;
+    }
+
+    .modal-close:hover {
+      color: var(--text);
+      background: var(--surface-hover);
+    }
+
+    .btn-row .spacer { flex: 1; }
 
     /* External plugin badge + meta + remove */
     .badge-external {
@@ -479,7 +532,7 @@
 
     <header>
       <h1><span>Admin</span> Panel</h1>
-      <p><strong>Enabled</strong> is the global switch. <strong>Claude Code</strong> controls visibility in the Claude Code marketplace view. <strong>Git</strong> controls visibility in the Git repository view. You can also add external plugins from GitHub below.</p>
+      <p><strong>Enabled</strong> is the global switch. <strong>Claude Code</strong> controls visibility in the Claude Code marketplace view. <strong>Git</strong> controls visibility in the Git repository view.</p>
     </header>
 
     <div class="stats-bar" id="stats-bar"></div>
@@ -488,24 +541,9 @@
       <button class="btn accent" onclick="enableAll()">Enable All</button>
       <button class="btn" onclick="disableAll()">Disable All</button>
       <button class="btn" onclick="resetToDefaults()">Reset Defaults</button>
+      <div class="spacer"></div>
+      <button class="btn accent" onclick="openExternalModal()">+ Add External Plugin</button>
     </div>
-
-    <section class="add-external">
-      <h2>Add External Plugin</h2>
-      <p class="hint">Paste a GitHub URL pointing to a plugin directory. The latest commit on the URL's branch is used unless you specify a commit SHA.</p>
-      <form id="add-external-form" onsubmit="return submitAddExternal(event)">
-        <div class="form-row">
-          <input type="text" id="ext-url" autocomplete="off" spellcheck="false"
-                 placeholder="https://github.com/owner/repo/tree/main/plugins/my-plugin" required>
-          <button type="submit" class="btn accent" id="ext-submit">Add Plugin</button>
-        </div>
-        <div class="form-row">
-          <input type="text" id="ext-sha" autocomplete="off" spellcheck="false"
-                 placeholder="Optional commit SHA (defaults to latest)">
-        </div>
-        <div id="ext-status" class="form-status"></div>
-      </form>
-    </section>
 
     <table class="plugin-table">
       <colgroup>
@@ -528,6 +566,27 @@
     <footer>
       <p>Changes are saved in your browser and apply immediately to all views.</p>
     </footer>
+  </div>
+
+  <!-- Add External Plugin modal -->
+  <div id="external-modal" class="modal" hidden onclick="handleModalOverlayClick(event)">
+    <div class="modal-dialog add-external" role="dialog" aria-modal="true" aria-labelledby="ext-modal-title">
+      <button class="modal-close" type="button" onclick="closeExternalModal()" aria-label="Close">&times;</button>
+      <h2 id="ext-modal-title">Add External Plugin</h2>
+      <p class="hint">Paste a GitHub URL pointing to a plugin directory. The latest commit on the URL's branch is used unless you specify a commit SHA.</p>
+      <form id="add-external-form" onsubmit="return submitAddExternal(event)">
+        <div class="form-row">
+          <input type="text" id="ext-url" autocomplete="off" spellcheck="false"
+                 placeholder="https://github.com/owner/repo/tree/main/plugins/my-plugin" required>
+          <button type="submit" class="btn accent" id="ext-submit">Add Plugin</button>
+        </div>
+        <div class="form-row">
+          <input type="text" id="ext-sha" autocomplete="off" spellcheck="false"
+                 placeholder="Optional commit SHA (defaults to latest)">
+        </div>
+        <div id="ext-status" class="form-status"></div>
+      </form>
+    </div>
   </div>
 
   <script>
@@ -838,11 +897,39 @@
       render();
     }
 
-    // --- Add-external form handler -------------------------------------------
+    // --- Add-external modal + form handler -----------------------------------
+    function openExternalModal() {
+      const modal = document.getElementById("external-modal");
+      modal.hidden = false;
+      // Reset transient state each time we open
+      setStatus("", "");
+      document.getElementById("ext-status").textContent = "";
+      // Focus the URL field after the dialog paints
+      setTimeout(() => document.getElementById("ext-url").focus(), 0);
+    }
+
+    function closeExternalModal() {
+      const modal = document.getElementById("external-modal");
+      modal.hidden = true;
+    }
+
+    function handleModalOverlayClick(event) {
+      // Clicks on the overlay (target === modal root) close; clicks inside the
+      // dialog bubble up but should not close the modal.
+      if (event.target === event.currentTarget) closeExternalModal();
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        const modal = document.getElementById("external-modal");
+        if (modal && !modal.hidden) closeExternalModal();
+      }
+    });
+
     function setStatus(kind, msg) {
       const el = document.getElementById("ext-status");
-      el.className = "form-status " + kind;
-      el.textContent = msg;
+      el.className = "form-status " + (kind || "");
+      el.textContent = msg || "";
     }
 
     async function submitAddExternal(event) {
@@ -868,6 +955,8 @@
         urlEl.value = "";
         shaEl.value = "";
         render();
+        // Close the modal shortly after success so the user sees the toast.
+        setTimeout(closeExternalModal, 900);
       } catch (e) {
         setStatus("error", e.message || String(e));
       } finally {
