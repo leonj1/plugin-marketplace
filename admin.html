@@ -532,7 +532,7 @@
 
     <header>
       <h1><span>Admin</span> Panel</h1>
-      <p><strong>Enabled</strong> is the global switch. <strong>Claude Code</strong> controls visibility in the Claude Code marketplace view. <strong>Git</strong> controls visibility in the Git repository view.</p>
+      <p><strong>Enabled</strong> is the global switch. <strong>Claude Code</strong> controls visibility in the Claude Code marketplace view. <strong>Git</strong> controls visibility in the Git repository view. External plugins are downloaded into the marketplace repo so any CLI can clone them.</p>
     </header>
 
     <div class="stats-bar" id="stats-bar"></div>
@@ -573,7 +573,7 @@
     <div class="modal-dialog add-external" role="dialog" aria-modal="true" aria-labelledby="ext-modal-title">
       <button class="modal-close" type="button" onclick="closeExternalModal()" aria-label="Close">&times;</button>
       <h2 id="ext-modal-title">Add External Plugin</h2>
-      <p class="hint">Paste a GitHub URL pointing to a plugin directory. The latest commit on the URL's branch is used unless you specify a commit SHA.</p>
+      <p class="hint">Paste a GitHub URL pointing to a plugin directory. The latest commit on the URL's branch is used unless you specify a commit SHA. The files are downloaded server-side and committed into the marketplace repository so any CLI can clone them.</p>
       <form id="add-external-form" onsubmit="return submitAddExternal(event)">
         <div class="form-row">
           <input type="text" id="ext-url" autocomplete="off" spellcheck="false"
@@ -630,19 +630,24 @@
     ];
 
     // --- Storage --------------------------------------------------------------
-    // Three visibility axes plus an external-plugin registry.
+    // Three per-browser visibility axes live in localStorage:
     //   enabled     - global master switch
     //   claudeCode  - visibility in the Claude Code marketplace view (index.html)
     //   git         - visibility in the Git repository view (repo.html)
-    //   external    - registry of user-added GitHub plugin references
+    //
+    // The external-plugin REGISTRY is server-side state, served by the
+    // ingest service at /api/external. We cache it in memory after each
+    // fetch and never persist it in localStorage, so every browser sees
+    // the same set of plugins (those that were actually downloaded into
+    // the marketplace repo).
     const STORAGE_KEYS = {
       enabled:    "plugin-marketplace-enabled",
       claudeCode: "plugin-marketplace-claude-code",
-      git:        "plugin-marketplace-git",
-      external:   "plugin-marketplace-external"
+      git:        "plugin-marketplace-git"
     };
 
     const BUILTIN_KEYS = BUILTIN_PLUGINS.map(p => p.name);
+    let externalsCache = [];
 
     function getNames(axis) {
       try {
@@ -667,15 +672,20 @@
     }
 
     function getExternals() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEYS.external);
-        if (raw) return JSON.parse(raw);
-      } catch (e) {}
-      return [];
+      return externalsCache.slice();
     }
 
-    function setExternals(arr) {
-      localStorage.setItem(STORAGE_KEYS.external, JSON.stringify(arr));
+    async function refreshExternals() {
+      try {
+        const r = await fetch("/api/external", { cache: "no-store" });
+        if (!r.ok) throw new Error(`/api/external returned ${r.status}`);
+        const data = await r.json();
+        externalsCache = Array.isArray(data.externals) ? data.externals : [];
+      } catch (e) {
+        console.warn("Could not fetch external plugin registry:", e);
+        externalsCache = [];
+      }
+      return externalsCache;
     }
 
     // --- GitHub URL parsing + commit resolution -------------------------------
@@ -718,49 +728,43 @@
       return `github:${repo}:${path || ""}`;
     }
 
+    // Add and remove are now server operations. The server downloads the
+    // GitHub source tarball, extracts the plugin sub-path into the
+    // marketplace's bare repo, updates both marketplace.json files, and
+    // persists the registry. The client just calls the API and refreshes.
     async function addExternalPlugin(urlStr, shaInput) {
       const parsed = parseGithubUrl(urlStr);
       if (!parsed) throw new Error("Not a recognized GitHub URL");
-      const { repo, ref, path } = parsed;
 
-      // Resolve to a full commit SHA. If the user pasted a SHA, that becomes
-      // the ref we resolve, so we still get back the canonical 40-char value.
-      const userSha = (shaInput || "").trim();
-      const commit = await resolveCommit(repo, userSha || ref);
-
-      const name = (path ? path.split("/").pop() : repo.split("/").pop()).trim() || "plugin";
-      const id   = externalId(repo, path);
-
-      const existing = getExternals();
-      if (existing.some(p => p.id === id)) {
-        throw new Error("That plugin is already added");
-      }
-
-      const plugin = {
-        id,
-        name,
-        repo,
-        path: path || "",
-        ref:  ref || "HEAD",
-        commit,
-        url:  urlStr.trim(),
-        addedAt: Date.now()
-      };
-      existing.push(plugin);
-      setExternals(existing);
+      const r = await fetch("/api/external", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ url: urlStr.trim(), sha: (shaInput || "").trim() })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || `Ingest service returned ${r.status}`);
+      const plugin = data.plugin;
+      if (!plugin || !plugin.id) throw new Error("Ingest service returned an unexpected response");
 
       // Default-on for both relevant axes (Git toggle is N/A for externals).
-      setOn("enabled",    id, true);
-      setOn("claudeCode", id, true);
+      setOn("enabled",    plugin.id, true);
+      setOn("claudeCode", plugin.id, true);
+
+      await refreshExternals();
       return plugin;
     }
 
-    function removeExternalPlugin(id) {
-      setExternals(getExternals().filter(p => p.id !== id));
+    async function removeExternalPlugin(id) {
+      const r = await fetch("/api/external/" + encodeURIComponent(id), { method: "DELETE" });
+      if (!r.ok && r.status !== 204) {
+        const data = await r.json().catch(() => ({}));
+        throw new Error(data.error || `Ingest service returned ${r.status}`);
+      }
       // Clean up any toggle entries so re-adding starts fresh.
       ["enabled", "claudeCode", "git"].forEach(axis => {
         setNames(axis, getNames(axis).filter(n => n !== id));
       });
+      await refreshExternals();
     }
 
     // --- Rendering ------------------------------------------------------------
@@ -864,10 +868,14 @@
       render();
     }
 
-    function removeExt(id) {
-      if (!confirm("Remove this external plugin?")) return;
-      removeExternalPlugin(id);
-      render();
+    async function removeExt(id) {
+      if (!confirm("Remove this external plugin? Files will be deleted from the marketplace repo.")) return;
+      try {
+        await removeExternalPlugin(id);
+        render();
+      } catch (e) {
+        alert("Could not remove plugin: " + (e.message || e));
+      }
     }
 
     function allKeys() {
@@ -968,7 +976,24 @@
       return false;
     }
 
-    render();
+    // Initial load: fetch the server-side external registry, then render.
+    (async () => {
+      await refreshExternals();
+      render();
+    })();
+
+    // Other tabs may have added/removed external plugins. Re-fetch the
+    // server registry when this tab regains focus.
+    window.addEventListener("focus", async () => {
+      await refreshExternals();
+      render();
+    });
+    document.addEventListener("visibilitychange", async () => {
+      if (!document.hidden) {
+        await refreshExternals();
+        render();
+      }
+    });
   </script>
 </body>
 </html>

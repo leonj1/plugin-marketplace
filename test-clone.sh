@@ -81,4 +81,58 @@ for path in /.claude-plugin/marketplace.json /.factory-plugin/marketplace.json; 
     pass "served $path"
 done
 
+# Optional: exercise the external-plugin ingest API end-to-end. Skipped
+# when SKIP_INGEST=1 or when offline (downloads from github.com).
+if [[ "${SKIP_INGEST:-0}" != "1" ]]; then
+    info "6/6  External plugin ingest API (POST /api/external, clone, DELETE)"
+    EXT_URL="https://github.com/anthropics/claude-plugins-official/tree/main/plugins/claude-md-management"
+    EXT_ID="github:anthropics/claude-plugins-official:plugins/claude-md-management"
+
+    # Make sure the slot is empty before we start, so re-runs are idempotent.
+    curl -sS -X DELETE "$BASE_URL/api/external/$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$EXT_ID")" >/dev/null || true
+
+    BODY="$(curl -sS -X POST "$BASE_URL/api/external" \
+        -H 'Content-Type: application/json' \
+        -d "{\"url\":\"$EXT_URL\"}" \
+        -w '\nHTTP_CODE=%{http_code}')"
+    HTTP_CODE="$(printf '%s\n' "$BODY" | sed -n 's/^HTTP_CODE=//p')"
+    if [[ "$HTTP_CODE" != "201" ]]; then
+        printf '%s\n' "$BODY" >&2
+        fail "POST /api/external returned HTTP $HTTP_CODE (expected 201)"
+    fi
+    pass "POST /api/external accepted (201)"
+
+    # Clone again and check the new plugin is in the bare repo and listed
+    # in both marketplace.json files.
+    CLONE2_DIR="$TMP_DIR/marketplace-with-ext"
+    if ! git clone -q "$REPO_URL" "$CLONE2_DIR" 2>"$TMP_DIR/clone2.log"; then
+        cat "$TMP_DIR/clone2.log" >&2
+        fail "git clone after ingest failed"
+    fi
+    if [[ ! -d "$CLONE2_DIR/plugins/claude-md-management" ]]; then
+        fail "ingested plugin missing from cloned repo: plugins/claude-md-management"
+    fi
+    pass "cloned repo contains plugins/claude-md-management/"
+
+    for mf in .claude-plugin/marketplace.json .factory-plugin/marketplace.json; do
+        if ! python3 -c "import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if any(p.get('name')=='claude-md-management' for p in d.get('plugins', [])) else 1)" "$CLONE2_DIR/$mf"; then
+            fail "ingested plugin not listed in $mf"
+        fi
+        pass "$mf lists claude-md-management"
+    done
+
+    DEL_CODE="$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE "$BASE_URL/api/external/$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$EXT_ID")")"
+    if [[ "$DEL_CODE" != "204" ]]; then
+        fail "DELETE /api/external returned HTTP $DEL_CODE (expected 204)"
+    fi
+    pass "DELETE /api/external accepted (204)"
+
+    CLONE3_DIR="$TMP_DIR/marketplace-after-delete"
+    git clone -q "$REPO_URL" "$CLONE3_DIR" 2>/dev/null
+    if [[ -d "$CLONE3_DIR/plugins/claude-md-management" ]]; then
+        fail "plugin still present after DELETE"
+    fi
+    pass "plugin removed from cloned repo after DELETE"
+fi
+
 printf '\n\033[32mAll checks passed — any CLI can clone %s\033[0m\n' "$REPO_URL"

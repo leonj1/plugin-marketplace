@@ -417,30 +417,46 @@
       ]
     };
 
-    function render() {
-      // Merge built-in plugins with user-added external plugins from localStorage.
-      // Externals are emitted with a proper github source object so the embedded
-      // marketplace.json matches the schema Claude Code expects.
-      let externals = [];
+    async function fetchExternals() {
+      // External plugins live server-side now (downloaded into the
+      // marketplace repo by the ingest service). Fall back to localStorage
+      // for backwards compat with older sessions that still hold a stale
+      // client-only registry.
+      try {
+        const r = await fetch("/api/external", { cache: "no-store" });
+        if (r.ok) {
+          const data = await r.json();
+          if (Array.isArray(data.externals)) return data.externals;
+        }
+      } catch (e) {
+        console.warn("Could not fetch /api/external, falling back to localStorage:", e);
+      }
       try {
         const raw = localStorage.getItem("plugin-marketplace-external");
-        if (raw) externals = JSON.parse(raw) || [];
+        if (raw) return JSON.parse(raw) || [];
       } catch (e) {}
+      return [];
+    }
+
+    async function render() {
+      // Merge built-in plugins with user-added external plugins from the
+      // ingest service. Each external is emitted with a proper relative
+      // source pointing at the downloaded ./plugins/<name>/ directory, so
+      // the embedded marketplace.json matches what CLIs see when they
+      // fetch /.claude-plugin/marketplace.json directly.
+      const externals = await fetchExternals();
       const externalAsPlugins = externals.map(p => ({
         name: p.name,
-        source: {
-          source: "github",
-          repo:   p.repo,
-          commit: p.commit,
-          path:   p.path || undefined
-        },
+        source: `./plugins/${p.name}`,
         description: p.description || `External plugin from ${p.repo}`,
         version: p.commit ? p.commit.slice(0, 7) : "external",
         author: { name: p.repo.split("/")[0] },
         category: "external",
         tags: ["external", "github"],
         license: "see source",
-        _externalUrl: p.url
+        _externalUrl: p.url,
+        _externalRepo: p.repo,
+        _externalCommit: p.commit
       }));
 
       const plugins = [...MARKETPLACE_DATA.plugins, ...externalAsPlugins];
@@ -460,8 +476,8 @@
       const claudeCodeNames = readNames("plugin-marketplace-claude-code");
       // Use the same key strategy as admin.html: built-ins use their name,
       // external plugins use their `github:<repo>:<path>` id.
-      const keyFor = (p) => p.source && typeof p.source === "object" && p.source.source === "github"
-        ? `github:${p.source.repo}:${p.source.path || ""}`
+      const keyFor = (p) => p._externalRepo
+        ? `github:${p._externalRepo}:${externals.find(e => e.repo === p._externalRepo && e.name === p.name)?.path || ""}`
         : p.name;
       const isVisible = (p) => {
         const k = keyFor(p);
@@ -537,6 +553,13 @@
     }
 
     render();
+
+    // Re-fetch the external registry when this tab regains focus, so a
+    // plugin added in /admin shows up here without a hard refresh.
+    window.addEventListener("focus", render);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) render();
+    });
   </script>
 </body>
 </html>

@@ -477,8 +477,7 @@
     //     Git column as a dash for external rows.
     const STORAGE_KEYS = {
       enabled:  "plugin-marketplace-enabled",
-      git:      "plugin-marketplace-git",
-      external: "plugin-marketplace-external"
+      git:      "plugin-marketplace-git"
     };
 
     function readNames(key) {
@@ -489,12 +488,31 @@
       return null;
     }
 
-    function readExternals() {
+    // Cache of external plugins loaded from the server's ingest service.
+    let externalsCache = [];
+
+    async function fetchExternals() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEYS.external);
-        if (raw) return JSON.parse(raw) || [];
+        const r = await fetch("/api/external", { cache: "no-store" });
+        if (r.ok) {
+          const data = await r.json();
+          if (Array.isArray(data.externals)) {
+            externalsCache = data.externals;
+            return externalsCache;
+          }
+        }
+      } catch (e) {
+        console.warn("Could not fetch /api/external, falling back to localStorage:", e);
+      }
+      try {
+        const raw = localStorage.getItem("plugin-marketplace-external");
+        if (raw) {
+          externalsCache = JSON.parse(raw) || [];
+          return externalsCache;
+        }
       } catch (e) {}
-      return [];
+      externalsCache = [];
+      return externalsCache;
     }
 
     function externalKey(p) {
@@ -504,7 +522,7 @@
     function buildTree() {
       const enabled = readNames(STORAGE_KEYS.enabled);
       const git     = readNames(STORAGE_KEYS.git);
-      const externals = readExternals();
+      const externals = externalsCache;
 
       const builtinVisible = (p) =>
         (enabled === null || enabled.includes(p.name)) &&
@@ -515,16 +533,22 @@
       };
 
       const filteredBuiltins  = PLUGIN_DIRS.filter(builtinVisible);
+      // Externals are downloaded into the marketplace repo, so they show
+      // up as real plugin folders alongside built-ins. We render them with
+      // the External badge + commit chip to make their provenance clear.
       const filteredExternals = externals
         .filter(externalVisible)
         .map(p => ({
           name: p.name,
-          type: "external",
+          type: "external-dir",
           repo: p.repo,
           path: p.path || "",
           ref:  p.ref,
           commit: p.commit,
-          url:  p.url
+          url:  p.url,
+          // External plugins live at plugins/<name>/ in the repo. We don't
+          // know their internal layout up-front, so render them as a leaf
+          // node with the source link instead of a deep tree.
         }));
 
       return [
@@ -553,7 +577,7 @@
 
     function iconFor(node) {
       if (node.type === "dir") return "📁";
-      if (node.type === "external") return "🔗";
+      if (node.type === "external" || node.type === "external-dir") return "🔗";
       const ext = node.ext || "";
       switch (ext) {
         case "md": return "📝";
@@ -567,7 +591,7 @@
 
     function iconClassFor(node) {
       if (node.type === "dir") return "folder-icon";
-      if (node.type === "external") return "external-icon";
+      if (node.type === "external" || node.type === "external-dir") return "external-icon";
       switch (node.ext) {
         case "md": return "markdown-icon";
         case "json": return "json-icon";
@@ -580,7 +604,7 @@
       function walk(nodes) {
         for (const n of nodes) {
           if (n.type === "dir") { dirs++; walk(n.children || []); }
-          else if (n.type === "external") externals++;
+          else if (n.type === "external" || n.type === "external-dir") externals++;
           else files++;
         }
       }
@@ -603,14 +627,20 @@
             </div>
           `;
         }
-        if (n.type === "external") {
+        if (n.type === "external" || n.type === "external-dir") {
           const shortSha = (n.commit || "").slice(0, 7);
           const repoPath = n.path ? `${n.repo}/${n.path}` : n.repo;
+          // 'external-dir' marks plugins that were downloaded into the repo
+          // (so they are real folders). 'external' was the older reference-
+          // only mode. Both render with the badge + source link.
+          const iconClass = n.type === "external-dir" ? "folder-icon" : iconClassFor(n);
+          const icon      = n.type === "external-dir" ? "📁"           : iconFor(n);
+          const nameClass = n.type === "external-dir" ? "folder-name"  : "";
           return `
             <div class="file-row">
               <span class="toggle-arrow" style="visibility:hidden">▶</span>
-              <span class="file-icon ${iconClassFor(n)}">${iconFor(n)}</span>
-              <span class="file-name">${escapeHtml(n.name)}</span>
+              <span class="file-icon ${iconClass}">${icon}</span>
+              <span class="file-name ${nameClass}">${escapeHtml(n.name)}</span>
               <span class="badge-external">External</span>
               <span class="ext-source">
                 <a href="${escapeHtml(n.url)}" target="_blank" rel="noopener" title="Open source on GitHub">${escapeHtml(repoPath)}</a>
@@ -658,9 +688,10 @@
     };
 
     // Render the tree. Wrapped in a function so it can be re-invoked when
-    // localStorage changes (e.g., after adding an external plugin in
-    // admin.html in another tab, or returning to this tab).
-    function renderAll() {
+    // state changes (e.g., after adding an external plugin in admin.html
+    // in another tab, or returning to this tab).
+    async function renderAll() {
+      await fetchExternals();
       const tree = buildTree();
       document.getElementById("file-list").innerHTML = renderTree(tree, 0);
       const { dirs, files, externals } = countItems(tree);
@@ -673,7 +704,8 @@
 
     // Re-render when admin changes the marketplace state. The 'storage' event
     // fires for changes made in *other* tabs; we also re-render on focus so
-    // changes made in this tab via /admin (same-tab nav back) are picked up.
+    // changes made in this tab via /admin (same-tab nav back) are picked up,
+    // and the server-side external registry is re-fetched each time.
     window.addEventListener("storage", (e) => {
       if (!e.key || e.key.startsWith("plugin-marketplace-")) renderAll();
     });

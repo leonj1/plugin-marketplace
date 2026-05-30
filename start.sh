@@ -32,11 +32,29 @@ fi
 # Ensure the nginx/fcgiwrap user can read the repo regardless of who created it
 chown -R nginx:nginx /var/lib/git
 
+# Persistent state for the ingest service (external plugin registry)
+mkdir -p /var/lib/marketplace
+chown -R nginx:nginx /var/lib/marketplace
+
+# The ingest service runs as root but the bare repo is owned by `nginx`.
+# Modern git refuses to operate on a repo whose ownership differs from
+# the calling uid unless that path is on the `safe.directory` whitelist.
+# We trust everything inside the container, so whitelist all paths.
+git config --system --add safe.directory '*' || true
+
 # Start fcgiwrap
 echo "Starting fcgiwrap..."
 spawn-fcgi -s /var/run/fcgiwrap.socket -M 766 -u nginx -g nginx /usr/sbin/fcgiwrap
 sleep 0.5
 chmod 766 /var/run/fcgiwrap.socket
+
+# Start the external-plugin ingest service. Runs as root so it can write
+# into /usr/share/nginx/html and the bare repo; nginx proxies /api/external
+# to it on 127.0.0.1:8089.
+echo "Starting ingest service..."
+INGEST_HOST=127.0.0.1 INGEST_PORT=8089 \
+  python3 /opt/ingest/ingest.py >/var/log/ingest.log 2>&1 &
+sleep 0.5
 
 # Start nginx in foreground
 echo "Starting nginx..."
