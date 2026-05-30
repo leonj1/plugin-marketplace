@@ -93,6 +93,139 @@
       margin-bottom: 1.5rem;
     }
 
+    /* Add-external form */
+    .add-external {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .add-external h2 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+    }
+
+    .add-external .hint {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.75rem;
+    }
+
+    .add-external .form-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .add-external input[type="text"] {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      color: var(--text);
+      font-size: 0.85rem;
+      font-family: inherit;
+      min-width: 0;
+    }
+
+    .add-external input[type="text"]:focus {
+      outline: none;
+      border-color: var(--accent-dim);
+    }
+
+    .add-external input[type="text"]:disabled,
+    .add-external button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .form-status {
+      font-size: 0.8rem;
+      min-height: 1.2em;
+      margin-top: 0.25rem;
+    }
+
+    .form-status.error   { color: var(--red); }
+    .form-status.success { color: var(--green); }
+    .form-status.info    { color: var(--text-secondary); }
+
+    /* External plugin badge + meta + remove */
+    .badge-external {
+      display: inline-block;
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: rgba(96, 165, 250, 0.15);
+      color: var(--blue);
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      margin-left: 0.4rem;
+      vertical-align: middle;
+    }
+
+    .ext-meta {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      margin-top: 0.3rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .ext-meta a {
+      color: var(--blue);
+      text-decoration: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+    }
+
+    .ext-meta a:hover { text-decoration: underline; }
+
+    .ext-meta code {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 0.7rem;
+      color: var(--text);
+      background: var(--bg);
+      padding: 0.05rem 0.35rem;
+      border-radius: 3px;
+    }
+
+    .name-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      align-items: flex-start;
+    }
+
+    .remove-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      border-radius: 4px;
+      padding: 0.15rem 0.45rem;
+      cursor: pointer;
+      font-size: 0.7rem;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+
+    .remove-btn:hover {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    .toggle-cell.na {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+
     .btn {
       font-size: 0.78rem;
       padding: 0.35rem 0.85rem;
@@ -346,7 +479,7 @@
 
     <header>
       <h1><span>Admin</span> Panel</h1>
-      <p><strong>Enabled</strong> is the global switch. <strong>Claude Code</strong> controls visibility in the Claude Code marketplace view. <strong>Git</strong> controls visibility in the Git repository view.</p>
+      <p><strong>Enabled</strong> is the global switch. <strong>Claude Code</strong> controls visibility in the Claude Code marketplace view. <strong>Git</strong> controls visibility in the Git repository view. You can also add external plugins from GitHub below.</p>
     </header>
 
     <div class="stats-bar" id="stats-bar"></div>
@@ -356,6 +489,23 @@
       <button class="btn" onclick="disableAll()">Disable All</button>
       <button class="btn" onclick="resetToDefaults()">Reset Defaults</button>
     </div>
+
+    <section class="add-external">
+      <h2>Add External Plugin</h2>
+      <p class="hint">Paste a GitHub URL pointing to a plugin directory. The latest commit on the URL's branch is used unless you specify a commit SHA.</p>
+      <form id="add-external-form" onsubmit="return submitAddExternal(event)">
+        <div class="form-row">
+          <input type="text" id="ext-url" autocomplete="off" spellcheck="false"
+                 placeholder="https://github.com/owner/repo/tree/main/plugins/my-plugin" required>
+          <button type="submit" class="btn accent" id="ext-submit">Add Plugin</button>
+        </div>
+        <div class="form-row">
+          <input type="text" id="ext-sha" autocomplete="off" spellcheck="false"
+                 placeholder="Optional commit SHA (defaults to latest)">
+        </div>
+        <div id="ext-status" class="form-status"></div>
+      </form>
+    </section>
 
     <table class="plugin-table">
       <colgroup>
@@ -381,7 +531,8 @@
   </div>
 
   <script>
-    const ALL_PLUGINS = [
+    // --- Built-in plugins (shipped with this marketplace) ---------------------
+    const BUILTIN_PLUGINS = [
       {
         "name": "code-review",
         "description": "Automated code review skill that checks for bugs, security issues, performance problems, and style violations",
@@ -419,106 +570,256 @@
       }
     ];
 
-    // Three independent visibility axes:
+    // --- Storage --------------------------------------------------------------
+    // Three visibility axes plus an external-plugin registry.
     //   enabled     - global master switch
-    //   claude-code - visibility in the Claude Code marketplace view (index.html)
+    //   claudeCode  - visibility in the Claude Code marketplace view (index.html)
     //   git         - visibility in the Git repository view (repo.html)
+    //   external    - registry of user-added GitHub plugin references
     const STORAGE_KEYS = {
       enabled:    "plugin-marketplace-enabled",
       claudeCode: "plugin-marketplace-claude-code",
-      git:        "plugin-marketplace-git"
+      git:        "plugin-marketplace-git",
+      external:   "plugin-marketplace-external"
     };
 
-    const ALL_NAMES = ALL_PLUGINS.map(p => p.name);
+    const BUILTIN_KEYS = BUILTIN_PLUGINS.map(p => p.name);
 
     function getNames(axis) {
       try {
         const raw = localStorage.getItem(STORAGE_KEYS[axis]);
         if (raw) return JSON.parse(raw);
       } catch (e) {}
-      // Default: all on
-      return ALL_NAMES.slice();
+      // Default: all built-ins on. External plugins are only added to the
+      // arrays at the moment they are registered, so they default-on too.
+      return BUILTIN_KEYS.slice();
     }
 
     function setNames(axis, names) {
       localStorage.setItem(STORAGE_KEYS[axis], JSON.stringify(names));
     }
 
-    function isOn(axis, name) {
-      return getNames(axis).includes(name);
-    }
-
-    function setOn(axis, name, on) {
+    function setOn(axis, key, on) {
       const names = getNames(axis);
-      const idx = names.indexOf(name);
-      if (on && idx === -1) names.push(name);
+      const idx = names.indexOf(key);
+      if (on && idx === -1) names.push(key);
       if (!on && idx !== -1) names.splice(idx, 1);
       setNames(axis, names);
     }
 
+    function getExternals() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.external);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return [];
+    }
+
+    function setExternals(arr) {
+      localStorage.setItem(STORAGE_KEYS.external, JSON.stringify(arr));
+    }
+
+    // --- GitHub URL parsing + commit resolution -------------------------------
+    // Accepts:
+    //   https://github.com/owner/repo
+    //   https://github.com/owner/repo.git
+    //   https://github.com/owner/repo/tree/<ref>
+    //   https://github.com/owner/repo/tree/<ref>/<path>
+    //   https://github.com/owner/repo/blob/<ref>/<path>   (treated as tree)
+    // NOTE: branch names containing slashes cannot be disambiguated from URL
+    // alone. Such users should paste the commit SHA explicitly.
+    function parseGithubUrl(url) {
+      const m = String(url || "").trim().match(
+        /^https?:\/\/github\.com\/([^\/\s?#]+)\/([^\/\s?#]+?)(?:\.git)?(?:\/(?:tree|blob)\/([^\/\s?#]+)(?:\/([^?#]+?))?)?\/?(?:[?#].*)?$/
+      );
+      if (!m) return null;
+      return {
+        repo: `${m[1]}/${m[2]}`,
+        ref:  m[3] || null,
+        path: (m[4] || "").replace(/\/+$/, "")
+      };
+    }
+
+    // Resolve any ref (branch, tag, short SHA, full SHA, or HEAD when null)
+    // to a full 40-char commit SHA via the unauthenticated commits API.
+    async function resolveCommit(repo, ref) {
+      const r = await fetch(
+        `https://api.github.com/repos/${repo}/commits/${encodeURIComponent(ref || "HEAD")}`,
+        { headers: { "Accept": "application/vnd.github+json" } }
+      );
+      if (r.status === 404) throw new Error(`Not found on GitHub: ${repo} @ ${ref || "default branch"}`);
+      if (r.status === 403) throw new Error("GitHub API rate limit exceeded. Try again later or paste the commit SHA directly.");
+      if (!r.ok) throw new Error(`GitHub API error ${r.status} resolving ${repo}@${ref || "HEAD"}`);
+      const d = await r.json();
+      if (!d || !d.sha) throw new Error("GitHub returned no commit SHA");
+      return d.sha;
+    }
+
+    function externalId(repo, path) {
+      return `github:${repo}:${path || ""}`;
+    }
+
+    async function addExternalPlugin(urlStr, shaInput) {
+      const parsed = parseGithubUrl(urlStr);
+      if (!parsed) throw new Error("Not a recognized GitHub URL");
+      const { repo, ref, path } = parsed;
+
+      // Resolve to a full commit SHA. If the user pasted a SHA, that becomes
+      // the ref we resolve, so we still get back the canonical 40-char value.
+      const userSha = (shaInput || "").trim();
+      const commit = await resolveCommit(repo, userSha || ref);
+
+      const name = (path ? path.split("/").pop() : repo.split("/").pop()).trim() || "plugin";
+      const id   = externalId(repo, path);
+
+      const existing = getExternals();
+      if (existing.some(p => p.id === id)) {
+        throw new Error("That plugin is already added");
+      }
+
+      const plugin = {
+        id,
+        name,
+        repo,
+        path: path || "",
+        ref:  ref || "HEAD",
+        commit,
+        url:  urlStr.trim(),
+        addedAt: Date.now()
+      };
+      existing.push(plugin);
+      setExternals(existing);
+
+      // Default-on for both relevant axes (Git toggle is N/A for externals).
+      setOn("enabled",    id, true);
+      setOn("claudeCode", id, true);
+      return plugin;
+    }
+
+    function removeExternalPlugin(id) {
+      setExternals(getExternals().filter(p => p.id !== id));
+      // Clean up any toggle entries so re-adding starts fresh.
+      ["enabled", "claudeCode", "git"].forEach(axis => {
+        setNames(axis, getNames(axis).filter(n => n !== id));
+      });
+    }
+
+    // --- Rendering ------------------------------------------------------------
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+      })[c]);
+    }
+
     function render() {
+      const externals = getExternals();
+      const all = [
+        ...BUILTIN_PLUGINS.map(p => ({ ...p, _key: p.name, _external: false })),
+        ...externals.map(p => ({ ...p, _key: p.id, _external: true,
+                                  category: "external",
+                                  tags: ["external", "github"],
+                                  version: p.commit.slice(0, 7),
+                                  description: p.description || `External plugin from ${p.repo}` }))
+      ];
+
       const enabled = getNames("enabled");
       const claude  = getNames("claudeCode");
       const git     = getNames("git");
-      const total   = ALL_PLUGINS.length;
+      const total   = all.length;
+      const builtinTotal = BUILTIN_PLUGINS.length;
 
-      // Effective visibility per view = enabled AND axis-on
-      const claudeVisible = ALL_NAMES.filter(n => enabled.includes(n) && claude.includes(n)).length;
-      const gitVisible    = ALL_NAMES.filter(n => enabled.includes(n) && git.includes(n)).length;
+      const claudeVisible = all.filter(p => enabled.includes(p._key) && claude.includes(p._key)).length;
+      const gitVisible    = BUILTIN_PLUGINS.filter(p => enabled.includes(p.name) && git.includes(p.name)).length;
+      const enabledCount  = all.filter(p => enabled.includes(p._key)).length;
 
       document.getElementById("stats-bar").innerHTML =
-        `<span><strong>${enabled.length}</strong> / ${total} enabled</span>` +
+        `<span><strong>${enabledCount}</strong> / ${total} enabled</span>` +
         `<span><strong>${claudeVisible}</strong> / ${total} visible in Claude Code</span>` +
-        `<span><strong>${gitVisible}</strong> / ${total} visible in Git</span>`;
+        `<span><strong>${gitVisible}</strong> / ${builtinTotal} visible in Git <span style="opacity:0.6">(built-ins only)</span></span>`;
 
-      document.getElementById("plugin-list").innerHTML = ALL_PLUGINS.map(p => {
-        const en = enabled.includes(p.name);
-        const cc = claude.includes(p.name);
-        const gi = git.includes(p.name);
-        // When global enabled is off, the per-view toggles are visually muted
-        // (they still hold their value, just can't take effect).
+      document.getElementById("plugin-list").innerHTML = all.map(p => {
+        const en = enabled.includes(p._key);
+        const cc = claude.includes(p._key);
+        const gi = git.includes(p._key);
         const muted = en ? "" : " muted";
+        const key = escapeHtml(p._key);
+
+        const nameHtml = p._external
+          ? `<div class="name-row">
+               <div>
+                 <span class="name">${escapeHtml(p.name)}</span>
+                 <span class="badge-external">External</span>
+                 <span style="font-weight:400;font-size:0.75rem;color:var(--text-secondary)">${escapeHtml(p.version)}</span>
+               </div>
+               <button class="remove-btn" onclick="removeExt('${key}')" title="Remove this external plugin">Remove</button>
+             </div>`
+          : `<div class="name">${escapeHtml(p.name)} <span style="font-weight:400;font-size:0.75rem;color:var(--text-secondary)">v${escapeHtml(p.version)}</span></div>`;
+
+        const metaHtml = p._external
+          ? `<div class="ext-meta">
+               <a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.repo)}${p.path ? "/" + escapeHtml(p.path) : ""}</a>
+               <code title="Pinned commit">${escapeHtml(p.commit.slice(0, 7))}</code>
+               <span>ref: ${escapeHtml(p.ref)}</span>
+             </div>`
+          : "";
+
+        const gitCellHtml = p._external
+          ? `<td class="toggle-cell na" data-label="Git" title="Not applicable: external plugins are not in the local bare repo">&mdash;</td>`
+          : `<td class="toggle-cell${muted}" data-label="Git">
+               <label class="toggle">
+                 <input type="checkbox" ${gi ? "checked" : ""} onchange="toggle('git', '${key}', this.checked)">
+                 <span class="slider"></span>
+               </label>
+             </td>`;
+
         return `
           <tr class="${en ? "" : "disabled"}">
             <td>
               <div class="plugin-info">
-                <div class="name">${p.name} <span style="font-weight:400;font-size:0.75rem;color:var(--text-secondary)">v${p.version}</span></div>
-                <div class="desc">${p.description}</div>
-                <div class="tags">${p.tags.map(t => `<span class="tag">${t}</span>`).join("")}</div>
+                ${nameHtml}
+                <div class="desc">${escapeHtml(p.description)}</div>
+                <div class="tags">${(p.tags || []).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join("")}</div>
+                ${metaHtml}
               </div>
             </td>
             <td class="toggle-cell" data-label="Enabled">
               <label class="toggle">
-                <input type="checkbox" ${en ? "checked" : ""} onchange="toggle('enabled', '${p.name}', this.checked)">
+                <input type="checkbox" ${en ? "checked" : ""} onchange="toggle('enabled', '${key}', this.checked)">
                 <span class="slider"></span>
               </label>
             </td>
             <td class="toggle-cell${muted}" data-label="Claude Code">
               <label class="toggle">
-                <input type="checkbox" ${cc ? "checked" : ""} onchange="toggle('claudeCode', '${p.name}', this.checked)">
+                <input type="checkbox" ${cc ? "checked" : ""} onchange="toggle('claudeCode', '${key}', this.checked)">
                 <span class="slider"></span>
               </label>
             </td>
-            <td class="toggle-cell${muted}" data-label="Git">
-              <label class="toggle">
-                <input type="checkbox" ${gi ? "checked" : ""} onchange="toggle('git', '${p.name}', this.checked)">
-                <span class="slider"></span>
-              </label>
-            </td>
+            ${gitCellHtml}
           </tr>
         `;
       }).join("");
     }
 
-    function toggle(axis, name, on) {
-      setOn(axis, name, on);
+    function toggle(axis, key, on) {
+      setOn(axis, key, on);
       render();
     }
 
+    function removeExt(id) {
+      if (!confirm("Remove this external plugin?")) return;
+      removeExternalPlugin(id);
+      render();
+    }
+
+    function allKeys() {
+      return [...BUILTIN_KEYS, ...getExternals().map(p => p.id)];
+    }
+
     function enableAll() {
-      setNames("enabled",    ALL_NAMES.slice());
-      setNames("claudeCode", ALL_NAMES.slice());
-      setNames("git",        ALL_NAMES.slice());
+      const keys = allKeys();
+      setNames("enabled",    keys.slice());
+      setNames("claudeCode", keys.slice());
+      setNames("git",        BUILTIN_KEYS.slice()); // Git axis: built-ins only
       render();
     }
 
@@ -533,7 +834,49 @@
       localStorage.removeItem(STORAGE_KEYS.enabled);
       localStorage.removeItem(STORAGE_KEYS.claudeCode);
       localStorage.removeItem(STORAGE_KEYS.git);
+      // External plugin registry is intentionally NOT cleared by reset.
       render();
+    }
+
+    // --- Add-external form handler -------------------------------------------
+    function setStatus(kind, msg) {
+      const el = document.getElementById("ext-status");
+      el.className = "form-status " + kind;
+      el.textContent = msg;
+    }
+
+    async function submitAddExternal(event) {
+      event.preventDefault();
+      const urlEl = document.getElementById("ext-url");
+      const shaEl = document.getElementById("ext-sha");
+      const btn   = document.getElementById("ext-submit");
+      const url = urlEl.value.trim();
+      const sha = shaEl.value.trim();
+      if (!url) { setStatus("error", "Please enter a GitHub URL."); return false; }
+
+      urlEl.disabled = true;
+      shaEl.disabled = true;
+      btn.disabled   = true;
+      const oldLabel = btn.textContent;
+      btn.textContent = "Resolving…";
+      setStatus("info", sha ? "Verifying commit on GitHub…" : "Resolving latest commit on GitHub…");
+
+      try {
+        const plugin = await addExternalPlugin(url, sha);
+        setStatus("success",
+          `Added ${plugin.name} (${plugin.repo}${plugin.path ? "/" + plugin.path : ""}) pinned at ${plugin.commit.slice(0, 7)}`);
+        urlEl.value = "";
+        shaEl.value = "";
+        render();
+      } catch (e) {
+        setStatus("error", e.message || String(e));
+      } finally {
+        urlEl.disabled = false;
+        shaEl.disabled = false;
+        btn.disabled   = false;
+        btn.textContent = oldLabel;
+      }
+      return false;
     }
 
     render();

@@ -418,7 +418,32 @@
     };
 
     function render() {
-      const plugins = MARKETPLACE_DATA.plugins;
+      // Merge built-in plugins with user-added external plugins from localStorage.
+      // Externals are emitted with a proper github source object so the embedded
+      // marketplace.json matches the schema Claude Code expects.
+      let externals = [];
+      try {
+        const raw = localStorage.getItem("plugin-marketplace-external");
+        if (raw) externals = JSON.parse(raw) || [];
+      } catch (e) {}
+      const externalAsPlugins = externals.map(p => ({
+        name: p.name,
+        source: {
+          source: "github",
+          repo:   p.repo,
+          commit: p.commit,
+          path:   p.path || undefined
+        },
+        description: p.description || `External plugin from ${p.repo}`,
+        version: p.commit ? p.commit.slice(0, 7) : "external",
+        author: { name: p.repo.split("/")[0] },
+        category: "external",
+        tags: ["external", "github"],
+        license: "see source",
+        _externalUrl: p.url
+      }));
+
+      const plugins = [...MARKETPLACE_DATA.plugins, ...externalAsPlugins];
       const categories = [...new Set(plugins.map(p => p.category))];
 
       // Filter by enabled state + Claude Code view toggle from localStorage.
@@ -433,9 +458,16 @@
       }
       const enabledNames    = readNames("plugin-marketplace-enabled");
       const claudeCodeNames = readNames("plugin-marketplace-claude-code");
-      const isVisible = (p) =>
-        (enabledNames    === null || enabledNames.includes(p.name)) &&
-        (claudeCodeNames === null || claudeCodeNames.includes(p.name));
+      // Use the same key strategy as admin.html: built-ins use their name,
+      // external plugins use their `github:<repo>:<path>` id.
+      const keyFor = (p) => p.source && typeof p.source === "object" && p.source.source === "github"
+        ? `github:${p.source.repo}:${p.source.path || ""}`
+        : p.name;
+      const isVisible = (p) => {
+        const k = keyFor(p);
+        return (enabledNames    === null || enabledNames.includes(k)) &&
+               (claudeCodeNames === null || claudeCodeNames.includes(k));
+      };
       const visible = plugins.filter(isVisible);
       const visibleCategories = [...new Set(visible.map(p => p.category))];
 
@@ -454,8 +486,14 @@
 
       renderPlugins(visible);
 
-      // Build filtered marketplace JSON for raw view (same visibility rule)
-      const filteredData = { ...MARKETPLACE_DATA, plugins: visible };
+      // Build filtered marketplace JSON for raw view (same visibility rule).
+      // Strip internal "_*" fields so the published JSON stays clean.
+      const cleanPlugins = visible.map(p => {
+        const out = {};
+        for (const k in p) if (!k.startsWith("_")) out[k] = p[k];
+        return out;
+      });
+      const filteredData = { ...MARKETPLACE_DATA, plugins: cleanPlugins };
       document.getElementById("json-content").textContent = JSON.stringify(filteredData, null, 2);
     }
 
