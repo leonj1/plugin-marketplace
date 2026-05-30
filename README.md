@@ -11,6 +11,13 @@ git endpoint) from a single nginx + git-http-backend container.
 | Droid CLI marketplace | `git clone http://<host>/droid/v1/marketplace.git` (Smart-HTTP) |
 | Browser UI | `/index.html`, `/repo.html`, `/admin.html` |
 
+## Screenshots
+
+| Marketplace (`/index.html`) | Repository (`/repo.html`) | Admin (`/admin.html`) |
+|---|---|---|
+| ![Marketplace](docs/screenshots/marketplace.png) | ![Repository](docs/screenshots/repository.png) | ![Admin](docs/screenshots/admin.png) |
+| Plugin grid with search, category filter, and live stats. Same data the Claude Code CLI sees via `/.claude-plugin/marketplace.json`. | Browseable file tree of the served bare repo. Click any file to open the in-page viewer (markdown-rendered, JSON pretty-print toggle, plain text). | Per-plugin toggles for Enabled / Claude Code / Git visibility. Add an external GitHub plugin from the modal — its files are downloaded into the marketplace repo. |
+
 ## Quickstart (3 minutes)
 
 **Prereqs:** Docker, `make`, `git`, `curl`.
