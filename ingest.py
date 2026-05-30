@@ -124,6 +124,107 @@ def walk_tree(root):
     return nodes
 
 
+# --- Repo file reader -----------------------------------------------------
+
+# Files larger than this are refused as a defence against accidentally
+# loading huge binaries (e.g. images) into the browser.
+MAX_FILE_BYTES = 2 * 1024 * 1024  # 2 MiB
+
+# A small allow-list of extensions we treat as text. Anything else is
+# rejected to keep the viewer from rendering arbitrary binary content.
+TEXT_EXTS = {
+    "md", "markdown", "txt", "text",
+    "json", "yaml", "yml", "toml", "ini", "cfg", "conf",
+    "py", "js", "mjs", "ts", "tsx", "jsx",
+    "html", "htm", "css", "scss",
+    "sh", "bash", "zsh", "fish",
+    "rb", "go", "rs", "java", "c", "cc", "cpp", "h", "hpp",
+    "php", "pl", "lua", "swift", "kt", "kts", "dart",
+    "xml", "svg",
+    "dockerfile", "makefile", "gitignore", "gitattributes",
+    "lock", "log", "env", "example", "sample",
+    "license", "licence",
+    "",  # extensionless files (Dockerfile, Makefile, LICENSE...)
+}
+
+
+def _is_path_safe(p):
+    """Reject absolute paths and any segment of '..' to prevent traversal."""
+    if not p or p.startswith("/"):
+        return False
+    if any(part in ("", "..", ".") for part in p.split("/")):
+        return False
+    return True
+
+
+def _classify(path):
+    """Return a short type tag used by the front-end to choose a renderer."""
+    name = os.path.basename(path).lower()
+    ext  = os.path.splitext(name)[1].lstrip(".").lower()
+    if ext in ("md", "markdown"):                   return "markdown"
+    if ext == "json":                               return "json"
+    if ext in ("yaml", "yml"):                      return "yaml"
+    if name in ("dockerfile", "makefile", "license", "licence"):
+        return "text"
+    return "text"
+
+
+def _looks_binary(blob):
+    """Heuristic: treat as binary if there's any NUL byte or many control bytes."""
+    if b"\x00" in blob:
+        return True
+    # Reject if >10% of the first 8 KiB are non-text control bytes.
+    sample = blob[:8192]
+    if not sample:
+        return False
+    nonprint = sum(1 for b in sample if b < 9 or (13 < b < 32))
+    return nonprint / len(sample) > 0.1
+
+
+def read_repo_file(path):
+    """Read a file from the bare git repo by path (relative to repo root).
+
+    Uses `git show master:<path>` so every file in the marketplace tree
+    is accessible, including files that are not statically served by
+    nginx (Dockerfile, start.sh, nginx.conf)."""
+    if not _is_path_safe(path):
+        raise ValueError("Path is not allowed")
+
+    name = os.path.basename(path).lower()
+    ext  = os.path.splitext(name)[1].lstrip(".").lower()
+    extkey = ext if ext else name  # for extensionless files match by name
+    if ext not in TEXT_EXTS and extkey not in TEXT_EXTS and name not in TEXT_EXTS:
+        raise ValueError(f"File type '.{ext or name}' is not viewable as text")
+
+    proc = subprocess.run(
+        ["git", "-C", GIT_DIR, "show", f"master:{path}"],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=_git_env(),
+    )
+    if proc.returncode != 0:
+        err = proc.stderr.decode("utf-8", errors="replace").strip()
+        if "does not exist" in err or "exists on disk" in err:
+            raise FileNotFoundError(path)
+        raise RuntimeError(err or f"git show failed for {path}")
+    blob = proc.stdout
+
+    if len(blob) > MAX_FILE_BYTES:
+        raise ValueError(f"File too large to display ({len(blob)} bytes; max {MAX_FILE_BYTES})")
+    if _looks_binary(blob):
+        raise ValueError("File appears to be binary")
+
+    try:
+        text = blob.decode("utf-8")
+    except UnicodeDecodeError:
+        text = blob.decode("latin-1")
+
+    return {
+        "path":    path,
+        "kind":    _classify(path),
+        "size":    len(blob),
+        "content": text,
+    }
+
+
 # --- Registry persistence --------------------------------------------------
 
 def load_externals():
@@ -504,6 +605,21 @@ class IngestHandler(BaseHTTPRequestHandler):
             return self._send_json(200, {"ok": True})
         if self.path == "/api/external":
             return self._send_json(200, {"externals": load_externals()})
+        # GET /api/file?path=<repo-relative-path>
+        if self.path.startswith("/api/file"):
+            parsed = urllib.parse.urlparse(self.path)
+            qs = urllib.parse.parse_qs(parsed.query)
+            raw = (qs.get("path") or [""])[0]
+            try:
+                payload = read_repo_file(raw)
+            except FileNotFoundError:
+                return self._send_json(404, {"error": "File not found"})
+            except ValueError as e:
+                return self._send_json(400, {"error": str(e)})
+            except Exception as e:
+                log(f"read_repo_file failed: {e}")
+                return self._send_json(500, {"error": f"Read failed: {e}"})
+            return self._send_json(200, payload)
         return self._send_json(404, {"error": "Not found"})
 
     def do_POST(self):

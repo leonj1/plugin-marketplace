@@ -147,4 +147,33 @@ sys.exit(0 if (ext and isinstance(ext.get('tree'), list) and ext['tree']) else 1
     pass "plugin removed from cloned repo after DELETE"
 fi
 
+info "7/7  File viewer API (GET /api/file)"
+# Markdown
+MD_BODY="$(curl -fsS "$BASE_URL/api/file?path=plugins/code-review/skills/code-review/SKILL.md")"
+if ! python3 -c "import json,sys; d=json.loads(sys.argv[1]); assert d['kind']=='markdown' and d['size']>0 and d['content']" "$MD_BODY" 2>/dev/null; then
+    fail "GET /api/file did not return markdown content for SKILL.md"
+fi
+pass "Markdown file fetched and classified as 'markdown'"
+
+# JSON
+JSON_BODY="$(curl -fsS "$BASE_URL/api/file?path=plugins/code-review/.claude-plugin/plugin.json")"
+if ! python3 -c "import json,sys; d=json.loads(sys.argv[1]); assert d['kind']=='json' and d['size']>0; json.loads(d['content'])" "$JSON_BODY" 2>/dev/null; then
+    fail "GET /api/file did not return parseable JSON content"
+fi
+pass "JSON file fetched, classified as 'json', and content parses"
+
+# Path traversal must be rejected
+TRAV_CODE="$(curl -sS -o /dev/null -w '%{http_code}' "$BASE_URL/api/file?path=../../../etc/passwd")"
+if [[ "$TRAV_CODE" != "400" ]]; then
+    fail "Path traversal returned HTTP $TRAV_CODE (expected 400)"
+fi
+pass "Path traversal rejected with 400"
+
+# Missing file -> 404
+MISSING_CODE="$(curl -sS -o /dev/null -w '%{http_code}' "$BASE_URL/api/file?path=plugins/does-not-exist.txt")"
+if [[ "$MISSING_CODE" != "404" ]]; then
+    fail "Missing file returned HTTP $MISSING_CODE (expected 404)"
+fi
+pass "Missing file returns 404"
+
 printf '\n\033[32mAll checks passed — any CLI can clone %s\033[0m\n' "$REPO_URL"

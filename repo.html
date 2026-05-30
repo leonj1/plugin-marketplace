@@ -20,6 +20,9 @@
       --blue: #60a5fa;
       --green: #4ade80;
       --orange: #f59e0b;
+      --red: #f87171;
+      --tag-bg: #2a1a4a;
+      --tag-text: #c084fc;
     }
 
     body {
@@ -366,6 +369,165 @@
         margin-top: 0.5rem;
       }
     }
+
+    /* --- File row: make text-file rows look clickable -------------------- */
+    .file-row.file-clickable { cursor: pointer; }
+    .file-row.file-clickable:hover .file-name { color: var(--accent); }
+
+    /* --- File viewer modal ---------------------------------------------- */
+    .viewer-modal {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex; align-items: stretch; justify-content: center;
+      z-index: 1000; padding: 1.5rem;
+      animation: viewer-fade 0.15s ease-out;
+    }
+    .viewer-modal[hidden] { display: none; }
+    @keyframes viewer-fade { from { opacity: 0; } to { opacity: 1; } }
+
+    .viewer-dialog {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      width: 100%;
+      max-width: 1080px;
+      max-height: 100%;
+      display: flex; flex-direction: column;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+      overflow: hidden;
+    }
+
+    .viewer-head {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.65rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      flex-shrink: 0;
+    }
+    .viewer-path {
+      flex: 1;
+      font-family: "SF Mono", "Fira Code", "Fira Mono", monospace;
+      font-size: 0.82rem;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .viewer-path .dir { color: var(--text-secondary); }
+    .viewer-kind {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.15rem 0.45rem;
+      border-radius: 3px;
+      background: var(--tag-bg);
+      color: var(--tag-text);
+      flex-shrink: 0;
+    }
+    .viewer-size {
+      font-size: 0.7rem;
+      color: var(--text-tertiary);
+      flex-shrink: 0;
+    }
+    .viewer-actions {
+      display: flex; gap: 0.4rem; flex-shrink: 0;
+    }
+    .viewer-actions button {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      border-radius: 5px;
+      padding: 0.25rem 0.6rem;
+      cursor: pointer;
+      font-size: 0.75rem;
+      transition: all 0.15s;
+    }
+    .viewer-actions button:hover,
+    .viewer-actions button.active {
+      border-color: var(--accent-dim);
+      color: var(--text);
+    }
+    .viewer-actions button.active { background: var(--accent-dim); color: #fff; }
+
+    .viewer-body {
+      flex: 1;
+      overflow: auto;
+      background: var(--bg);
+      min-height: 0;
+    }
+    .viewer-body pre {
+      margin: 0;
+      padding: 1rem 1.25rem;
+      font-family: "SF Mono", "Fira Code", "Fira Mono", monospace;
+      font-size: 0.82rem;
+      line-height: 1.55;
+      color: var(--text);
+      white-space: pre;
+      tab-size: 4;
+    }
+    .viewer-body pre.wrap { white-space: pre-wrap; word-break: break-word; }
+    .viewer-status {
+      padding: 1.5rem;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+    .viewer-status.error { color: var(--red); }
+
+    /* Markdown body (rendered via marked.js + escaped HTML) */
+    .md-body { padding: 1.25rem 1.5rem; color: var(--text); font-size: 0.92rem; line-height: 1.7; }
+    .md-body h1, .md-body h2, .md-body h3, .md-body h4 {
+      color: var(--text); margin-top: 1.4em; margin-bottom: 0.5em; line-height: 1.3;
+    }
+    .md-body h1 { font-size: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
+    .md-body h2 { font-size: 1.2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25em; }
+    .md-body h3 { font-size: 1.05rem; }
+    .md-body p { margin: 0.75em 0; }
+    .md-body a { color: var(--blue); text-decoration: none; }
+    .md-body a:hover { text-decoration: underline; }
+    .md-body code {
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.85em;
+      background: var(--surface);
+      padding: 0.1em 0.35em;
+      border-radius: 3px;
+      color: var(--accent);
+    }
+    .md-body pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.85rem 1rem;
+      overflow-x: auto;
+      margin: 0.75em 0;
+    }
+    .md-body pre code {
+      background: transparent;
+      padding: 0;
+      color: var(--text);
+      font-size: 0.82em;
+    }
+    .md-body blockquote {
+      border-left: 3px solid var(--accent-dim);
+      padding: 0.1em 1em;
+      margin: 0.75em 0;
+      color: var(--text-secondary);
+    }
+    .md-body ul, .md-body ol { padding-left: 1.5em; margin: 0.5em 0; }
+    .md-body li { margin: 0.2em 0; }
+    .md-body table { border-collapse: collapse; margin: 0.75em 0; }
+    .md-body th, .md-body td {
+      border: 1px solid var(--border); padding: 0.4em 0.7em; font-size: 0.88em;
+    }
+    .md-body th { background: var(--surface); }
+    .md-body hr { border: none; border-top: 1px solid var(--border); margin: 1.5em 0; }
+    .md-body img { max-width: 100%; height: auto; border-radius: 4px; }
+
+    @media (max-width: 700px) {
+      .viewer-modal { padding: 0.5rem; }
+      .viewer-head { flex-wrap: wrap; }
+      .viewer-actions { width: 100%; justify-content: flex-end; }
+    }
   </style>
 </head>
 <body>
@@ -409,6 +571,42 @@
       </p>
     </footer>
   </div>
+
+  <!-- File viewer modal -->
+  <div id="viewer-modal" class="viewer-modal" hidden onclick="onViewerOverlayClick(event)">
+    <div class="viewer-dialog" role="dialog" aria-labelledby="viewer-path">
+      <div class="viewer-head">
+        <span class="viewer-path" id="viewer-path"></span>
+        <span class="viewer-kind" id="viewer-kind" hidden></span>
+        <span class="viewer-size" id="viewer-size" hidden></span>
+        <span class="viewer-actions" id="viewer-actions">
+          <button id="viewer-pretty-btn" hidden onclick="togglePretty()">Pretty</button>
+          <button id="viewer-wrap-btn" onclick="toggleWrap()">Wrap</button>
+          <button onclick="closeFileViewer()" title="Close (Esc)">Close</button>
+        </span>
+      </div>
+      <div class="viewer-body" id="viewer-body">
+        <div class="viewer-status">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Marked.js for client-side markdown rendering. Loaded only when needed. -->
+  <script>
+    let _markedLoading = null;
+    function ensureMarked() {
+      if (window.marked) return Promise.resolve(window.marked);
+      if (_markedLoading) return _markedLoading;
+      _markedLoading = new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js";
+        s.onload = () => resolve(window.marked);
+        s.onerror = () => reject(new Error("Failed to load markdown renderer"));
+        document.head.appendChild(s);
+      });
+      return _markedLoading;
+    }
+  </script>
 
   <script>
     // File tree — mirrors the git repo structure, filtered by admin enabled state
@@ -621,8 +819,10 @@
       return { dirs, files, externals };
     }
 
-    function renderTree(nodes, level) {
+    function renderTree(nodes, level, parentPath) {
+      parentPath = parentPath || "";
       return nodes.map(n => {
+        const childPath = parentPath ? parentPath + "/" + n.name : n.name;
         if (n.type === "dir") {
           const id = "dir-" + Math.random().toString(36).slice(2, 8);
           return `
@@ -632,7 +832,7 @@
               <span class="file-name folder-name">${escapeHtml(n.name)}</span>
             </div>
             <div class="file-children" id="${id}">
-              ${renderTree(n.children || [], level + 1)}
+              ${renderTree(n.children || [], level + 1, childPath)}
             </div>
           `;
         }
@@ -656,7 +856,7 @@
               </span>
             </div>
             <div class="file-children" id="${id}">
-              ${renderTree(n.children || [], level + 1)}
+              ${renderTree(n.children || [], level + 1, childPath)}
             </div>
           `;
         }
@@ -679,8 +879,10 @@
             </div>
           `;
         }
+        // File leaf — clickable to open in the viewer.
+        const safePath = childPath.replace(/'/g, "\\'");
         return `
-          <div class="file-row">
+          <div class="file-row file-clickable" onclick="openFileViewer('${safePath}')" title="View file">
             <span class="toggle-arrow" style="visibility:hidden">▶</span>
             <span class="file-icon ${iconClassFor(n)}">${iconFor(n)}</span>
             <span class="file-name">${escapeHtml(n.name)}</span>
@@ -743,6 +945,177 @@
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) renderAll();
     });
+
+    // ------------------------------------------------------------------
+    // File viewer
+    // ------------------------------------------------------------------
+    const viewerState = {
+      path: null,
+      kind: null,        // 'markdown' | 'json' | 'yaml' | 'text'
+      raw: "",           // original text content
+      pretty: true,      // current pretty-print state for JSON
+      wrap: false,       // current word-wrap state for raw text panes
+    };
+
+    function classifyFile(path) {
+      const lower = path.toLowerCase();
+      const m = lower.match(/\.([^./]+)$/);
+      const ext = m ? m[1] : "";
+      if (ext === "md" || ext === "markdown") return "markdown";
+      if (ext === "json") return "json";
+      if (ext === "yml" || ext === "yaml") return "yaml";
+      return "text";
+    }
+
+    async function openFileViewer(path) {
+      viewerState.path = path;
+      viewerState.kind = classifyFile(path);
+      viewerState.raw = "";
+      viewerState.pretty = true;
+      viewerState.wrap = false;
+
+      const modal = document.getElementById("viewer-modal");
+      const pathEl = document.getElementById("viewer-path");
+      const kindEl = document.getElementById("viewer-kind");
+      const sizeEl = document.getElementById("viewer-size");
+      const prettyBtn = document.getElementById("viewer-pretty-btn");
+      const wrapBtn = document.getElementById("viewer-wrap-btn");
+      const body = document.getElementById("viewer-body");
+
+      // Path display: show directory in muted color, filename in normal.
+      const lastSlash = path.lastIndexOf("/");
+      if (lastSlash >= 0) {
+        pathEl.innerHTML =
+          '<span class="dir">' + escapeHtml(path.slice(0, lastSlash + 1)) + '</span>' +
+          escapeHtml(path.slice(lastSlash + 1));
+      } else {
+        pathEl.textContent = path;
+      }
+      kindEl.hidden = false;
+      kindEl.textContent = viewerState.kind;
+      sizeEl.hidden = true;
+      prettyBtn.hidden = viewerState.kind !== "json";
+      prettyBtn.classList.toggle("active", viewerState.pretty);
+      wrapBtn.classList.toggle("active", viewerState.wrap);
+
+      body.innerHTML = '<div class="viewer-status">Loading…</div>';
+      modal.hidden = false;
+
+      try {
+        const url = "/api/file?path=" + encodeURIComponent(path);
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) {
+          let msg = "HTTP " + res.status;
+          try {
+            const j = await res.json();
+            if (j && j.error) msg = j.error;
+          } catch (_) {}
+          throw new Error(msg);
+        }
+        const data = await res.json();
+        if (data.binary) {
+          body.innerHTML = '<div class="viewer-status">Binary file — preview not supported.</div>';
+          if (typeof data.size === "number") {
+            sizeEl.hidden = false;
+            sizeEl.textContent = formatBytes(data.size);
+          }
+          return;
+        }
+        viewerState.raw = data.content || "";
+        if (typeof data.size === "number") {
+          sizeEl.hidden = false;
+          sizeEl.textContent = formatBytes(data.size);
+        }
+        renderViewerBody();
+      } catch (err) {
+        body.innerHTML = '<div class="viewer-status error">' +
+          escapeHtml(err.message || String(err)) + '</div>';
+      }
+    }
+
+    function renderViewerBody() {
+      const body = document.getElementById("viewer-body");
+      const wrapClass = viewerState.wrap ? " wrap" : "";
+
+      if (viewerState.kind === "markdown") {
+        body.innerHTML = '<div class="viewer-status">Rendering…</div>';
+        ensureMarked().then(marked => {
+          marked.setOptions({ gfm: true, breaks: false, headerIds: false, mangle: false });
+          // Use the parser; marked auto-escapes inline content. We only ever
+          // pass file text retrieved from our own /api/file, so this is safe.
+          const html = marked.parse(viewerState.raw);
+          body.innerHTML = '<div class="md-body">' + html + '</div>';
+          // Force any rendered links to open in a new tab.
+          body.querySelectorAll('a[href]').forEach(a => {
+            a.target = "_blank";
+            a.rel = "noopener";
+          });
+        }).catch(err => {
+          body.innerHTML = '<pre class="' + wrapClass.trim() + '">' +
+            escapeHtml(viewerState.raw) + '</pre>';
+        });
+        return;
+      }
+
+      if (viewerState.kind === "json") {
+        let text = viewerState.raw;
+        if (viewerState.pretty) {
+          try {
+            text = JSON.stringify(JSON.parse(viewerState.raw), null, 2);
+          } catch (_) {
+            // Not valid JSON — fall back to raw.
+          }
+        }
+        body.innerHTML = '<pre class="' + wrapClass.trim() + '">' +
+          escapeHtml(text) + '</pre>';
+        return;
+      }
+
+      // yaml + text + anything else: render as plain text in a <pre>.
+      body.innerHTML = '<pre class="' + wrapClass.trim() + '">' +
+        escapeHtml(viewerState.raw) + '</pre>';
+    }
+
+    function togglePretty() {
+      viewerState.pretty = !viewerState.pretty;
+      document.getElementById("viewer-pretty-btn").classList.toggle("active", viewerState.pretty);
+      renderViewerBody();
+    }
+
+    function toggleWrap() {
+      viewerState.wrap = !viewerState.wrap;
+      document.getElementById("viewer-wrap-btn").classList.toggle("active", viewerState.wrap);
+      renderViewerBody();
+    }
+
+    function closeFileViewer() {
+      document.getElementById("viewer-modal").hidden = true;
+    }
+
+    function onViewerOverlayClick(event) {
+      // Only close when clicking directly on the dim overlay, not the dialog.
+      if (event.target === event.currentTarget) closeFileViewer();
+    }
+
+    function formatBytes(n) {
+      if (n < 1024) return n + " B";
+      if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+      return (n / 1024 / 1024).toFixed(2) + " MB";
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        const modal = document.getElementById("viewer-modal");
+        if (modal && !modal.hidden) closeFileViewer();
+      }
+    });
+
+    // Expose for inline onclick handlers
+    window.openFileViewer = openFileViewer;
+    window.togglePretty = togglePretty;
+    window.toggleWrap = toggleWrap;
+    window.closeFileViewer = closeFileViewer;
+    window.onViewerOverlayClick = onViewerOverlayClick;
   </script>
 </body>
 </html>
