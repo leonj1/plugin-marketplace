@@ -746,9 +746,11 @@
       const plugin = data.plugin;
       if (!plugin || !plugin.id) throw new Error("Ingest service returned an unexpected response");
 
-      // Default-on for both relevant axes (Git toggle is N/A for externals).
+      // External plugins are downloaded into the marketplace bare repo,
+      // so they participate in all three axes. Default-on for each.
       setOn("enabled",    plugin.id, true);
       setOn("claudeCode", plugin.id, true);
+      setOn("git",        plugin.id, true);
 
       await refreshExternals();
       return plugin;
@@ -792,13 +794,13 @@
       const builtinTotal = BUILTIN_PLUGINS.length;
 
       const claudeVisible = all.filter(p => enabled.includes(p._key) && claude.includes(p._key)).length;
-      const gitVisible    = BUILTIN_PLUGINS.filter(p => enabled.includes(p.name) && git.includes(p.name)).length;
+      const gitVisible    = all.filter(p => enabled.includes(p._key) && git.includes(p._key)).length;
       const enabledCount  = all.filter(p => enabled.includes(p._key)).length;
 
       document.getElementById("stats-bar").innerHTML =
         `<span><strong>${enabledCount}</strong> / ${total} enabled</span>` +
         `<span><strong>${claudeVisible}</strong> / ${total} visible in Claude Code</span>` +
-        `<span><strong>${gitVisible}</strong> / ${builtinTotal} visible in Git <span style="opacity:0.6">(built-ins only)</span></span>`;
+        `<span><strong>${gitVisible}</strong> / ${total} visible in Git</span>`;
 
       document.getElementById("plugin-list").innerHTML = all.map(p => {
         const en = enabled.includes(p._key);
@@ -826,9 +828,7 @@
              </div>`
           : "";
 
-        const gitCellHtml = p._external
-          ? `<td class="toggle-cell na" data-label="Git" title="Not applicable: external plugins are not in the local bare repo">&mdash;</td>`
-          : `<td class="toggle-cell${muted}" data-label="Git">
+        const gitCellHtml = `<td class="toggle-cell${muted}" data-label="Git">
                <label class="toggle">
                  <input type="checkbox" ${gi ? "checked" : ""} onchange="toggle('git', '${key}', this.checked)">
                  <span class="slider"></span>
@@ -886,7 +886,7 @@
       const keys = allKeys();
       setNames("enabled",    keys.slice());
       setNames("claudeCode", keys.slice());
-      setNames("git",        BUILTIN_KEYS.slice()); // Git axis: built-ins only
+      setNames("git",        keys.slice());
       render();
     }
 

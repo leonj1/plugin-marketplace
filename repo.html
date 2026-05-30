@@ -725,9 +725,12 @@
       const builtinVisible = (p) =>
         (enabled === null || enabled.includes(p.name)) &&
         (git     === null || git.includes(p.name));
+      // External plugins are downloaded into this marketplace's bare repo,
+      // so they participate in the Git toggle just like built-ins.
       const externalVisible = (p) => {
         const k = externalKey(p);
-        return enabled === null || enabled.includes(k);
+        return (enabled === null || enabled.includes(k)) &&
+               (git     === null || git.includes(k));
       };
 
       const filteredBuiltins  = PLUGIN_DIRS.filter(builtinVisible);
