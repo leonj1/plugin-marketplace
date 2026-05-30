@@ -119,66 +119,73 @@
       background: var(--accent);
     }
 
-    /* Plugin list */
-    .plugin-list {
-      display: grid;
-      gap: 0.6rem;
+    /* Plugin table.
+       Using a real <table> guarantees the browser's table layout algorithm
+       keeps the column headers and the data cells in perfect alignment. */
+    .plugin-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 0.6rem; /* vertical gap between rows */
     }
 
-    .list-header {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      /* Border is transparent so the header inner geometry matches the
-         1px-bordered .plugin-row below it (both use box-sizing: border-box). */
-      border: 1px solid transparent;
-      padding: 0 1.25rem 0.4rem 1.25rem;
+    .plugin-table thead th {
+      padding: 0 1rem 0.4rem 1rem;
       font-size: 0.7rem;
+      font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.06em;
       color: var(--text-secondary);
+      text-align: left;
+      white-space: nowrap;
     }
 
-    .list-header .col-info { flex: 1; min-width: 0; }
-    .list-header .col-toggle {
-      flex: 0 0 96px;
+    .plugin-table thead th:first-child { padding-left: 1.25rem; }
+    .plugin-table thead th:last-child  { padding-right: 1.25rem; }
+    .plugin-table thead th.col-toggle  { text-align: center; }
+
+    /* Fixed toggle-column widths so header label, body cell, and toggle
+       all share the same x-position. */
+    .plugin-table col.col-toggle { width: 96px; }
+
+    .plugin-table tbody td {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 0.85rem 1rem;
+      vertical-align: middle;
+      transition: border-color 0.15s;
+    }
+
+    .plugin-table tbody td:first-child {
+      border-left: 1px solid var(--border);
+      border-top-left-radius: 8px;
+      border-bottom-left-radius: 8px;
+      padding-left: 1.25rem;
+    }
+
+    .plugin-table tbody td:last-child {
+      border-right: 1px solid var(--border);
+      border-top-right-radius: 8px;
+      border-bottom-right-radius: 8px;
+      padding-right: 1.25rem;
+    }
+
+    .plugin-table tbody tr:hover td {
+      border-color: var(--accent-dim);
+    }
+
+    .plugin-table tbody td.toggle-cell {
       text-align: center;
       white-space: nowrap;
     }
 
-    .plugin-row {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.85rem 1.25rem;
-      transition: border-color 0.15s;
-    }
-
-    .toggle-cell {
-      flex: 0 0 96px;
-      display: flex;
-      justify-content: center;
-    }
-
-    .toggle-cell.muted .toggle .slider {
+    .plugin-table tbody td.toggle-cell.muted .toggle .slider {
       opacity: 0.5;
     }
 
-    .plugin-row.disabled {
-      opacity: 0.45;
-    }
+    .plugin-table tbody tr.disabled { opacity: 0.45; }
 
-    .plugin-row:hover {
-      border-color: var(--accent-dim);
-    }
-
-    .plugin-info {
-      flex: 1;
-      min-width: 0;
-    }
+    .plugin-info { min-width: 0; }
 
     .plugin-info .name {
       font-weight: 600;
@@ -186,7 +193,7 @@
       color: var(--text);
     }
 
-    .plugin-row.disabled .name {
+    tr.disabled .plugin-info .name {
       text-decoration: line-through;
       color: var(--text-secondary);
     }
@@ -213,6 +220,9 @@
       padding: 0.1rem 0.4rem;
       border-radius: 3px;
     }
+
+    /* The inline toggle switch needs an inline-block container inside a td. */
+    .plugin-table .toggle { display: inline-block; vertical-align: middle; }
 
     /* Toggle switch */
     .toggle {
@@ -285,30 +295,43 @@
     }
 
     @media (max-width: 700px) {
-      .list-header { display: none; }
-      .plugin-row {
-        flex-wrap: wrap;
-        gap: 0.5rem;
+      /* Collapse the table into stacked cards. Each <tr> becomes a card and
+         each <td> becomes a labeled row. */
+      .plugin-table thead { display: none; }
+      .plugin-table, .plugin-table tbody, .plugin-table tr, .plugin-table td {
+        display: block;
+        width: 100%;
       }
-      .plugin-info {
-        flex-basis: 100%;
+      .plugin-table { border-spacing: 0; }
+      .plugin-table tbody tr {
+        margin-bottom: 0.6rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
       }
-      .plugin-info .desc {
-        white-space: normal;
+      .plugin-table tbody td,
+      .plugin-table tbody td:first-child,
+      .plugin-table tbody td:last-child {
+        border: none;
+        border-radius: 0;
+        padding: 0.5rem 1rem;
       }
-      .toggle-cell {
-        flex: 0 0 auto;
-        flex-direction: column;
+      .plugin-table tbody td:first-child { padding-top: 0.85rem; }
+      .plugin-table tbody td:last-child  { padding-bottom: 0.85rem; }
+      .plugin-table tbody td.toggle-cell {
+        display: flex;
         align-items: center;
-        gap: 0.25rem;
+        justify-content: space-between;
+        text-align: left;
       }
-      .toggle-cell::before {
+      .plugin-table tbody td.toggle-cell::before {
         content: attr(data-label);
-        font-size: 0.65rem;
+        font-size: 0.7rem;
         text-transform: uppercase;
         letter-spacing: 0.04em;
         color: var(--text-secondary);
       }
+      .plugin-info .desc { white-space: normal; }
     }
   </style>
 </head>
@@ -334,14 +357,23 @@
       <button class="btn" onclick="resetToDefaults()">Reset Defaults</button>
     </div>
 
-    <div class="list-header">
-      <div class="col-info">Plugin</div>
-      <div class="col-toggle">Enabled</div>
-      <div class="col-toggle">Claude Code</div>
-      <div class="col-toggle">Git</div>
-    </div>
-
-    <div class="plugin-list" id="plugin-list"></div>
+    <table class="plugin-table">
+      <colgroup>
+        <col class="col-info">
+        <col class="col-toggle">
+        <col class="col-toggle">
+        <col class="col-toggle">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Plugin</th>
+          <th class="col-toggle">Enabled</th>
+          <th class="col-toggle">Claude Code</th>
+          <th class="col-toggle">Git</th>
+        </tr>
+      </thead>
+      <tbody id="plugin-list"></tbody>
+    </table>
 
     <footer>
       <p>Changes are saved in your browser and apply immediately to all views.</p>
@@ -447,31 +479,33 @@
         // (they still hold their value, just can't take effect).
         const muted = en ? "" : " muted";
         return `
-          <div class="plugin-row${en ? "" : " disabled"}">
-            <div class="plugin-info">
-              <div class="name">${p.name} <span style="font-weight:400;font-size:0.75rem;color:var(--text-secondary)">v${p.version}</span></div>
-              <div class="desc">${p.description}</div>
-              <div class="tags">${p.tags.map(t => `<span class="tag">${t}</span>`).join("")}</div>
-            </div>
-            <div class="toggle-cell" data-label="Enabled">
+          <tr class="${en ? "" : "disabled"}">
+            <td>
+              <div class="plugin-info">
+                <div class="name">${p.name} <span style="font-weight:400;font-size:0.75rem;color:var(--text-secondary)">v${p.version}</span></div>
+                <div class="desc">${p.description}</div>
+                <div class="tags">${p.tags.map(t => `<span class="tag">${t}</span>`).join("")}</div>
+              </div>
+            </td>
+            <td class="toggle-cell" data-label="Enabled">
               <label class="toggle">
                 <input type="checkbox" ${en ? "checked" : ""} onchange="toggle('enabled', '${p.name}', this.checked)">
                 <span class="slider"></span>
               </label>
-            </div>
-            <div class="toggle-cell${muted}" data-label="Claude Code">
+            </td>
+            <td class="toggle-cell${muted}" data-label="Claude Code">
               <label class="toggle">
                 <input type="checkbox" ${cc ? "checked" : ""} onchange="toggle('claudeCode', '${p.name}', this.checked)">
                 <span class="slider"></span>
               </label>
-            </div>
-            <div class="toggle-cell${muted}" data-label="Git">
+            </td>
+            <td class="toggle-cell${muted}" data-label="Git">
               <label class="toggle">
                 <input type="checkbox" ${gi ? "checked" : ""} onchange="toggle('git', '${p.name}', this.checked)">
                 <span class="slider"></span>
               </label>
-            </div>
-          </div>
+            </td>
+          </tr>
         `;
       }).join("");
     }
