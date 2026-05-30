@@ -75,6 +75,40 @@
       text-transform: lowercase;
     }
 
+    .top-nav .nav-search {
+      margin-left: auto;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .top-nav .nav-search input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font: inherit;
+      font-size: 0.85rem;
+      padding: 0.35rem 0.65rem 0.35rem 1.85rem;
+      width: 220px;
+      transition: border-color 0.15s, width 0.15s;
+      outline: none;
+    }
+    .top-nav .nav-search input::placeholder { color: var(--text-secondary); }
+    .top-nav .nav-search input:focus {
+      border-color: var(--accent);
+      width: 280px;
+    }
+    .top-nav .nav-search-icon {
+      position: absolute;
+      left: 0.55rem;
+      pointer-events: none;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+    /* When the search slot is present, stats lose their auto margin so
+       the search sits between the links and the stats. */
+    .top-nav .nav-search ~ .nav-stats { margin-left: 1.25rem; }
+
     header {
       text-align: center;
       padding: 0.15rem 0 2rem;
@@ -305,9 +339,21 @@
     footer a { color: var(--accent); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
 
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+    .empty-state strong { color: var(--text); }
+
     @media (max-width: 600px) {
       header h1 { font-size: 1.5rem; }
       .top-nav { flex-wrap: wrap; gap: 1rem; }
+      .top-nav .nav-search { margin-left: 0; width: 100%; }
+      .top-nav .nav-search input,
+      .top-nav .nav-search input:focus { width: 100%; }
+      .top-nav .nav-search ~ .nav-stats { margin-left: 0; }
       .top-nav .nav-stats { margin-left: 0; gap: 0.9rem; width: 100%; justify-content: flex-start; }
       .top-nav .nav-stat { font-size: 0.8rem; }
     }
@@ -319,6 +365,10 @@
       <a href="index.html" class="active">Marketplace</a>
       <a href="repo.html">Repository</a>
       <a href="admin.html">Admin</a>
+      <label class="nav-search" title="Search by plugin name or description">
+        <span class="nav-search-icon" aria-hidden="true">⌕</span>
+        <input id="search" type="search" placeholder="Search plugins…" autocomplete="off" aria-label="Search plugins by name or description" />
+      </label>
       <div class="nav-stats" id="stats"></div>
     </nav>
 
@@ -356,6 +406,14 @@
   </div>
 
   <script>
+    // UI filter state shared across renders. activeCategory is set by the
+    // toolbar buttons; searchQuery is set by the search box in the top
+    // nav. currentVisible is the plugin list after toggle/external merge,
+    // cached so the search input can re-filter without re-doing fetches.
+    let activeCategory = "all";
+    let searchQuery = "";
+    let currentVisible = [];
+
     const MARKETPLACE_DATA = {
       "name": "droid-plugin-marketplace",
       "description": "A curated collection of productivity plugins for Claude Code, including code review, git workflows, documentation generation, test scaffolding, and refactoring tools",
@@ -497,10 +555,25 @@
       toolbar.innerHTML = `<button class="active" data-cat="all">All</button>` +
         visibleCategories.map(c => `<button data-cat="${c}">${c}</button>`).join("");
       toolbar.querySelectorAll("button").forEach(btn => {
-        btn.addEventListener("click", () => filterBy(btn.dataset.cat, visible));
+        btn.addEventListener("click", () => {
+          activeCategory = btn.dataset.cat;
+          applyFilters(visible);
+        });
       });
 
-      renderPlugins(visible);
+      // Wire up the search input. Reset the category to "all" only on the
+      // very first attach so that subsequent re-renders (focus/visibility)
+      // preserve the user's current view.
+      const searchInput = document.getElementById("search");
+      if (!searchInput.dataset.wired) {
+        searchInput.dataset.wired = "1";
+        searchInput.addEventListener("input", () => {
+          searchQuery = searchInput.value;
+          applyFilters(currentVisible);
+        });
+      }
+      currentVisible = visible;
+      applyFilters(visible);
 
       // Build filtered marketplace JSON for raw view (same visibility rule).
       // Strip internal "_*" fields so the published JSON stays clean.
@@ -514,7 +587,15 @@
     }
 
     function renderPlugins(plugins) {
-      document.getElementById("plugin-grid").innerHTML = plugins.map(p => `
+      const grid = document.getElementById("plugin-grid");
+      if (!plugins.length) {
+        const q = searchQuery.trim();
+        grid.innerHTML = q
+          ? `<div class="empty-state">No plugins match <strong>"${escapeHtml(q)}"</strong>${activeCategory !== "all" ? ` in <strong>${escapeHtml(activeCategory)}</strong>` : ""}.</div>`
+          : `<div class="empty-state">No plugins to show.</div>`;
+        return;
+      }
+      grid.innerHTML = plugins.map(p => `
         <div class="plugin-card">
           <div class="plugin-header">
             <span class="plugin-name">${p.name}</span>
@@ -530,13 +611,28 @@
       `).join("");
     }
 
-    function filterBy(cat, sourcePlugins) {
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+      })[c]);
+    }
+
+    // Filter the rendered grid by the active category AND the current
+    // search query (which matches name and description, case-insensitive).
+    // The toolbar/category buttons and the search input both call this.
+    function applyFilters(sourcePlugins) {
+      currentVisible = sourcePlugins;
       document.querySelectorAll(".toolbar button").forEach(b => {
-        b.classList.toggle("active", b.dataset.cat === cat);
+        b.classList.toggle("active", b.dataset.cat === activeCategory);
       });
-      const filtered = cat === "all"
-        ? sourcePlugins
-        : sourcePlugins.filter(p => p.category === cat);
+      const q = searchQuery.trim().toLowerCase();
+      const filtered = sourcePlugins.filter(p => {
+        if (activeCategory !== "all" && p.category !== activeCategory) return false;
+        if (!q) return true;
+        const name = (p.name || "").toLowerCase();
+        const desc = (p.description || "").toLowerCase();
+        return name.includes(q) || desc.includes(q);
+      });
       renderPlugins(filtered);
     }
 
