@@ -102,6 +102,18 @@ if [[ "${SKIP_INGEST:-0}" != "1" ]]; then
     fi
     pass "POST /api/external accepted (201)"
 
+    # The registry entry should now include the captured file tree so
+    # repo.html can render the plugin as a browseable folder.
+    if ! curl -sS "$BASE_URL/api/external" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+ext = next((e for e in d.get('externals', []) if e.get('name') == 'claude-md-management'), None)
+sys.exit(0 if (ext and isinstance(ext.get('tree'), list) and ext['tree']) else 1)
+"; then
+        fail "registry entry is missing its 'tree' field"
+    fi
+    pass "GET /api/external includes captured file tree"
+
     # Clone again and check the new plugin is in the bare repo and listed
     # in both marketplace.json files.
     CLONE2_DIR="$TMP_DIR/marketplace-with-ext"

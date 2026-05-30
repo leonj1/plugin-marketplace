@@ -94,6 +94,36 @@ def ensure_dirs():
     os.makedirs(os.path.dirname(FACTORY_MARKET), exist_ok=True)
 
 
+# --- File-tree walker -----------------------------------------------------
+
+def walk_tree(root):
+    """Walk `root` and return a JSON-serialisable tree of {name,type,ext,children}.
+
+    Directories come first, then files; both groups sorted alphabetically.
+    Used so repo.html can render external plugin contents the same way it
+    renders built-in plugins (with expandable folders)."""
+    if not os.path.isdir(root):
+        return []
+    entries = sorted(os.listdir(root), key=lambda n: (not os.path.isdir(os.path.join(root, n)), n.lower()))
+    nodes = []
+    for name in entries:
+        full = os.path.join(root, name)
+        if os.path.isdir(full):
+            nodes.append({
+                "name":     name,
+                "type":     "dir",
+                "children": walk_tree(full),
+            })
+        else:
+            ext = os.path.splitext(name)[1].lstrip(".").lower()
+            nodes.append({
+                "name": name,
+                "type": "file",
+                "ext":  ext,
+            })
+    return nodes
+
+
 # --- Registry persistence --------------------------------------------------
 
 def load_externals():
@@ -381,6 +411,9 @@ def add_external(url, sha_input):
                 "commit":  commit,
                 "url":     url.strip(),
                 "addedAt": None,
+                # File tree of the downloaded plugin, used by repo.html so
+                # the external plugin folder is fully browseable.
+                "tree":    walk_tree(staging),
             }
             new_externals = externals + [plugin]
             update_marketplaces(work, new_externals)
@@ -511,8 +544,27 @@ class IngestHandler(BaseHTTPRequestHandler):
 
 # --- main ------------------------------------------------------------------
 
+def backfill_trees():
+    """Older registry entries lacked a `tree` field. On startup, walk the
+    on-disk plugin folder of every external and populate it so repo.html
+    can render it as an expandable folder without re-ingesting."""
+    externals = load_externals()
+    changed = False
+    for ext in externals:
+        if ext.get("tree"):
+            continue
+        plugin_dir = os.path.join(PLUGINS_DIR, ext["name"])
+        if os.path.isdir(plugin_dir):
+            ext["tree"] = walk_tree(plugin_dir)
+            changed = True
+            log(f"backfilled tree for external {ext['name']}")
+    if changed:
+        save_externals(externals)
+
+
 def main():
     ensure_dirs()
+    backfill_trees()
     log(f"WEB_ROOT={WEB_ROOT}")
     log(f"PLUGINS_DIR={PLUGINS_DIR}")
     log(f"GIT_DIR={GIT_DIR}")

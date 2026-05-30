@@ -534,21 +534,24 @@
 
       const filteredBuiltins  = PLUGIN_DIRS.filter(builtinVisible);
       // Externals are downloaded into the marketplace repo, so they show
-      // up as real plugin folders alongside built-ins. We render them with
-      // the External badge + commit chip to make their provenance clear.
+      // up as real plugin folders alongside built-ins. Their file tree is
+      // captured by the ingest service and returned in the registry, so
+      // we render them as expandable directories adorned with an
+      // External badge + commit chip on the folder header row.
       const filteredExternals = externals
         .filter(externalVisible)
         .map(p => ({
           name: p.name,
-          type: "external-dir",
+          // If the registry includes the captured tree (added by the
+          // ingest service), render as a fully browseable folder. Older
+          // registry entries without `tree` fall back to a leaf node.
+          type: Array.isArray(p.tree) && p.tree.length ? "external-dir" : "external",
           repo: p.repo,
           path: p.path || "",
           ref:  p.ref,
           commit: p.commit,
           url:  p.url,
-          // External plugins live at plugins/<name>/ in the repo. We don't
-          // know their internal layout up-front, so render them as a leaf
-          // node with the source link instead of a deep tree.
+          children: Array.isArray(p.tree) ? p.tree : []
         }));
 
       return [
@@ -604,7 +607,13 @@
       function walk(nodes) {
         for (const n of nodes) {
           if (n.type === "dir") { dirs++; walk(n.children || []); }
-          else if (n.type === "external" || n.type === "external-dir") externals++;
+          else if (n.type === "external-dir") {
+            // External plugins downloaded into the repo are folders; their
+            // contents count towards dirs/files like any other folder, but
+            // we also keep an `externals` tally for the summary bar.
+            externals++; dirs++; walk(n.children || []);
+          }
+          else if (n.type === "external") externals++;
           else files++;
         }
       }
@@ -627,20 +636,41 @@
             </div>
           `;
         }
-        if (n.type === "external" || n.type === "external-dir") {
+        if (n.type === "external-dir") {
+          // External plugin that was downloaded into the marketplace repo.
+          // Render as a regular expandable folder, but adorn the header row
+          // with the External badge + GitHub source link + commit chip so
+          // its provenance stays obvious.
+          const id = "dir-" + Math.random().toString(36).slice(2, 8);
           const shortSha = (n.commit || "").slice(0, 7);
           const repoPath = n.path ? `${n.repo}/${n.path}` : n.repo;
-          // 'external-dir' marks plugins that were downloaded into the repo
-          // (so they are real folders). 'external' was the older reference-
-          // only mode. Both render with the badge + source link.
-          const iconClass = n.type === "external-dir" ? "folder-icon" : iconClassFor(n);
-          const icon      = n.type === "external-dir" ? "📁"           : iconFor(n);
-          const nameClass = n.type === "external-dir" ? "folder-name"  : "";
+          return `
+            <div class="file-row folder" data-dir-id="${id}" onclick="toggleDir('${id}')">
+              <span class="toggle-arrow">▶</span>
+              <span class="file-icon folder-icon">📁</span>
+              <span class="file-name folder-name">${escapeHtml(n.name)}</span>
+              <span class="badge-external">External</span>
+              <span class="ext-source">
+                <a href="${escapeHtml(n.url)}" target="_blank" rel="noopener" title="Open source on GitHub" onclick="event.stopPropagation()">${escapeHtml(repoPath)}</a>
+                <code title="Pinned commit">${escapeHtml(shortSha)}</code>
+              </span>
+            </div>
+            <div class="file-children" id="${id}">
+              ${renderTree(n.children || [], level + 1)}
+            </div>
+          `;
+        }
+        if (n.type === "external") {
+          // Legacy: registry entry without a captured tree (e.g. one added
+          // before this feature shipped). Render as a leaf with the source
+          // link only.
+          const shortSha = (n.commit || "").slice(0, 7);
+          const repoPath = n.path ? `${n.repo}/${n.path}` : n.repo;
           return `
             <div class="file-row">
               <span class="toggle-arrow" style="visibility:hidden">▶</span>
-              <span class="file-icon ${iconClass}">${icon}</span>
-              <span class="file-name ${nameClass}">${escapeHtml(n.name)}</span>
+              <span class="file-icon ${iconClassFor(n)}">${iconFor(n)}</span>
+              <span class="file-name">${escapeHtml(n.name)}</span>
               <span class="badge-external">External</span>
               <span class="ext-source">
                 <a href="${escapeHtml(n.url)}" target="_blank" rel="noopener" title="Open source on GitHub">${escapeHtml(repoPath)}</a>
