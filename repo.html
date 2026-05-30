@@ -422,21 +422,29 @@
       ]}
     ];
 
-    const STORAGE_KEY = "plugin-marketplace-enabled";
+    // Visibility in the Git repository view is the intersection of the
+    // global Enabled toggle and the per-view Git toggle (both default to
+    // "all visible" when no value is stored).
+    const STORAGE_KEYS = {
+      enabled: "plugin-marketplace-enabled",
+      git:     "plugin-marketplace-git"
+    };
 
-    function getEnabledNames() {
+    function readNames(key) {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const raw = localStorage.getItem(key);
         if (raw) return JSON.parse(raw);
       } catch (e) {}
       return null;
     }
 
     function buildTree() {
-      const enabled = getEnabledNames();
-      const filteredPlugins = enabled
-        ? PLUGIN_DIRS.filter(p => enabled.includes(p.name))
-        : PLUGIN_DIRS;
+      const enabled = readNames(STORAGE_KEYS.enabled);
+      const git     = readNames(STORAGE_KEYS.git);
+      const isVisible = (p) =>
+        (enabled === null || enabled.includes(p.name)) &&
+        (git     === null || git.includes(p.name));
+      const filteredPlugins = PLUGIN_DIRS.filter(isVisible);
 
       return [
         { name: ".claude-plugin", type: "dir", children: [

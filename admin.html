@@ -32,7 +32,7 @@
     }
 
     .container {
-      max-width: 720px;
+      max-width: 820px;
       margin: 0 auto;
       padding: 2rem 1.5rem;
     }
@@ -78,6 +78,7 @@
     /* Stats bar */
     .stats-bar {
       display: flex;
+      flex-wrap: wrap;
       gap: 1rem;
       margin-bottom: 1.5rem;
       font-size: 0.8rem;
@@ -124,6 +125,24 @@
       gap: 0.6rem;
     }
 
+    .list-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0 1.25rem 0.4rem 1.25rem;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-secondary);
+    }
+
+    .list-header .col-info { flex: 1; min-width: 0; }
+    .list-header .col-toggle {
+      width: 64px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
     .plugin-row {
       display: flex;
       align-items: center;
@@ -133,6 +152,17 @@
       border-radius: 8px;
       padding: 0.85rem 1.25rem;
       transition: border-color 0.15s;
+    }
+
+    .toggle-cell {
+      width: 64px;
+      display: flex;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .toggle-cell.muted .toggle .slider {
+      opacity: 0.5;
     }
 
     .plugin-row.disabled {
@@ -252,13 +282,30 @@
       font-size: 0.8rem;
     }
 
-    @media (max-width: 600px) {
+    @media (max-width: 700px) {
+      .list-header { display: none; }
       .plugin-row {
         flex-wrap: wrap;
         gap: 0.5rem;
       }
+      .plugin-info {
+        flex-basis: 100%;
+      }
       .plugin-info .desc {
         white-space: normal;
+      }
+      .toggle-cell {
+        width: auto;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      .toggle-cell::before {
+        content: attr(data-label);
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--text-secondary);
       }
     }
   </style>
@@ -274,7 +321,7 @@
 
     <header>
       <h1><span>Admin</span> Panel</h1>
-      <p>Enable or disable plugins. Disabled plugins are hidden from the marketplace and repository views.</p>
+      <p><strong>Enabled</strong> is the global switch. <strong>Claude Code</strong> controls visibility in the Claude Code marketplace view. <strong>Git</strong> controls visibility in the Git repository view.</p>
     </header>
 
     <div class="stats-bar" id="stats-bar"></div>
@@ -283,6 +330,13 @@
       <button class="btn accent" onclick="enableAll()">Enable All</button>
       <button class="btn" onclick="disableAll()">Disable All</button>
       <button class="btn" onclick="resetToDefaults()">Reset Defaults</button>
+    </div>
+
+    <div class="list-header">
+      <div class="col-info">Plugin</div>
+      <div class="col-toggle">Enabled</div>
+      <div class="col-toggle">Claude Code</div>
+      <div class="col-toggle">Git</div>
     </div>
 
     <div class="plugin-list" id="plugin-list"></div>
@@ -331,74 +385,118 @@
       }
     ];
 
-    const STORAGE_KEY = "plugin-marketplace-enabled";
+    // Three independent visibility axes:
+    //   enabled     - global master switch
+    //   claude-code - visibility in the Claude Code marketplace view (index.html)
+    //   git         - visibility in the Git repository view (repo.html)
+    const STORAGE_KEYS = {
+      enabled:    "plugin-marketplace-enabled",
+      claudeCode: "plugin-marketplace-claude-code",
+      git:        "plugin-marketplace-git"
+    };
 
-    function getEnabled() {
+    const ALL_NAMES = ALL_PLUGINS.map(p => p.name);
+
+    function getNames(axis) {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const raw = localStorage.getItem(STORAGE_KEYS[axis]);
         if (raw) return JSON.parse(raw);
       } catch (e) {}
-      // Default: all enabled
-      return ALL_PLUGINS.map(p => p.name);
+      // Default: all on
+      return ALL_NAMES.slice();
     }
 
-    function setEnabled(names) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(names));
+    function setNames(axis, names) {
+      localStorage.setItem(STORAGE_KEYS[axis], JSON.stringify(names));
     }
 
-    function isEnabled(name) {
-      return getEnabled().includes(name);
+    function isOn(axis, name) {
+      return getNames(axis).includes(name);
+    }
+
+    function setOn(axis, name, on) {
+      const names = getNames(axis);
+      const idx = names.indexOf(name);
+      if (on && idx === -1) names.push(name);
+      if (!on && idx !== -1) names.splice(idx, 1);
+      setNames(axis, names);
     }
 
     function render() {
-      const enabled = getEnabled();
-      const count = enabled.length;
+      const enabled = getNames("enabled");
+      const claude  = getNames("claudeCode");
+      const git     = getNames("git");
+      const total   = ALL_PLUGINS.length;
+
+      // Effective visibility per view = enabled AND axis-on
+      const claudeVisible = ALL_NAMES.filter(n => enabled.includes(n) && claude.includes(n)).length;
+      const gitVisible    = ALL_NAMES.filter(n => enabled.includes(n) && git.includes(n)).length;
+
       document.getElementById("stats-bar").innerHTML =
-        `<strong>${count}</strong> of <strong>${ALL_PLUGINS.length}</strong> plugins enabled`;
+        `<span><strong>${enabled.length}</strong> / ${total} enabled</span>` +
+        `<span><strong>${claudeVisible}</strong> / ${total} visible in Claude Code</span>` +
+        `<span><strong>${gitVisible}</strong> / ${total} visible in Git</span>`;
 
       document.getElementById("plugin-list").innerHTML = ALL_PLUGINS.map(p => {
-        const on = isEnabled(p.name);
+        const en = enabled.includes(p.name);
+        const cc = claude.includes(p.name);
+        const gi = git.includes(p.name);
+        // When global enabled is off, the per-view toggles are visually muted
+        // (they still hold their value, just can't take effect).
+        const muted = en ? "" : " muted";
         return `
-          <div class="plugin-row${on ? "" : " disabled"}">
+          <div class="plugin-row${en ? "" : " disabled"}">
             <div class="plugin-info">
               <div class="name">${p.name} <span style="font-weight:400;font-size:0.75rem;color:var(--text-secondary)">v${p.version}</span></div>
               <div class="desc">${p.description}</div>
               <div class="tags">${p.tags.map(t => `<span class="tag">${t}</span>`).join("")}</div>
             </div>
-            <span class="status-badge ${on ? "enabled" : "disabled"}">${on ? "ENABLED" : "DISABLED"}</span>
-            <label class="toggle">
-              <input type="checkbox" ${on ? "checked" : ""} onchange="togglePlugin('${p.name}', this.checked)">
-              <span class="slider"></span>
-            </label>
+            <div class="toggle-cell" data-label="Enabled">
+              <label class="toggle">
+                <input type="checkbox" ${en ? "checked" : ""} onchange="toggle('enabled', '${p.name}', this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="toggle-cell${muted}" data-label="Claude Code">
+              <label class="toggle">
+                <input type="checkbox" ${cc ? "checked" : ""} onchange="toggle('claudeCode', '${p.name}', this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="toggle-cell${muted}" data-label="Git">
+              <label class="toggle">
+                <input type="checkbox" ${gi ? "checked" : ""} onchange="toggle('git', '${p.name}', this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
           </div>
         `;
       }).join("");
     }
 
-    function togglePlugin(name, on) {
-      const enabled = getEnabled();
-      if (on) {
-        if (!enabled.includes(name)) enabled.push(name);
-      } else {
-        const idx = enabled.indexOf(name);
-        if (idx !== -1) enabled.splice(idx, 1);
-      }
-      setEnabled(enabled);
+    function toggle(axis, name, on) {
+      setOn(axis, name, on);
       render();
     }
 
     function enableAll() {
-      setEnabled(ALL_PLUGINS.map(p => p.name));
+      setNames("enabled",    ALL_NAMES.slice());
+      setNames("claudeCode", ALL_NAMES.slice());
+      setNames("git",        ALL_NAMES.slice());
       render();
     }
 
     function disableAll() {
-      setEnabled([]);
+      setNames("enabled",    []);
+      setNames("claudeCode", []);
+      setNames("git",        []);
       render();
     }
 
     function resetToDefaults() {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEYS.enabled);
+      localStorage.removeItem(STORAGE_KEYS.claudeCode);
+      localStorage.removeItem(STORAGE_KEYS.git);
       render();
     }
 

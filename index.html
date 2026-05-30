@@ -421,16 +421,22 @@
       const plugins = MARKETPLACE_DATA.plugins;
       const categories = [...new Set(plugins.map(p => p.category))];
 
-      // Filter by enabled state from localStorage
-      const STORAGE_KEY = "plugin-marketplace-enabled";
-      let enabledNames = null;
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) enabledNames = JSON.parse(raw);
-      } catch (e) {}
-      const visible = enabledNames
-        ? plugins.filter(p => enabledNames.includes(p.name))
-        : plugins;
+      // Filter by enabled state + Claude Code view toggle from localStorage.
+      // A plugin is visible here only if it is globally enabled AND the
+      // per-view Claude Code toggle is on (both default to "all visible").
+      function readNames(key) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw) return JSON.parse(raw);
+        } catch (e) {}
+        return null; // null => default (all visible)
+      }
+      const enabledNames    = readNames("plugin-marketplace-enabled");
+      const claudeCodeNames = readNames("plugin-marketplace-claude-code");
+      const isVisible = (p) =>
+        (enabledNames    === null || enabledNames.includes(p.name)) &&
+        (claudeCodeNames === null || claudeCodeNames.includes(p.name));
+      const visible = plugins.filter(isVisible);
       const visibleCategories = [...new Set(visible.map(p => p.category))];
 
       document.getElementById("stats").innerHTML = `
@@ -448,10 +454,8 @@
 
       renderPlugins(visible);
 
-      // Build filtered marketplace JSON for raw view
-      const filteredData = enabledNames
-        ? { ...MARKETPLACE_DATA, plugins: MARKETPLACE_DATA.plugins.filter(p => enabledNames.includes(p.name)) }
-        : MARKETPLACE_DATA;
+      // Build filtered marketplace JSON for raw view (same visibility rule)
+      const filteredData = { ...MARKETPLACE_DATA, plugins: visible };
       document.getElementById("json-content").textContent = JSON.stringify(filteredData, null, 2);
     }
 
