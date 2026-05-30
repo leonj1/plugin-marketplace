@@ -222,6 +222,52 @@
     .file-icon.file-icon-color { color: var(--text-tertiary); }
     .file-icon.markdown-icon { color: var(--accent); }
     .file-icon.json-icon { color: var(--orange); }
+    .file-icon.external-icon { color: var(--blue); }
+
+    /* External plugin row: badge + source link rendered inline */
+    .badge-external {
+      display: inline-block;
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: rgba(96, 165, 250, 0.15);
+      color: var(--blue);
+      padding: 0.05rem 0.4rem;
+      border-radius: 3px;
+      margin-left: 0.4rem;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+
+    .ext-source {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      flex-shrink: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 50%;
+    }
+
+    .ext-source a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    .ext-source a:hover { text-decoration: underline; }
+
+    .ext-source code {
+      font-family: "SF Mono", "Fira Code", "Fira Mono", monospace;
+      font-size: 0.68rem;
+      color: var(--text);
+      background: var(--bg);
+      padding: 0.05rem 0.35rem;
+      border-radius: 3px;
+    }
 
     .file-name {
       flex: 1;
@@ -422,12 +468,17 @@
       ]}
     ];
 
-    // Visibility in the Git repository view is the intersection of the
-    // global Enabled toggle and the per-view Git toggle (both default to
-    // "all visible" when no value is stored).
+    // Visibility in the Git repository view follows the same rules used by
+    // admin.html and index.html:
+    //   - Built-in plugins: visible when Enabled AND Git toggle both on.
+    //   - External plugins: visible when Enabled is on. The Git toggle is
+    //     N/A for externals (they're not in the local bare repo at all),
+    //     so we ignore it for them, matching admin.html which renders the
+    //     Git column as a dash for external rows.
     const STORAGE_KEYS = {
-      enabled: "plugin-marketplace-enabled",
-      git:     "plugin-marketplace-git"
+      enabled:  "plugin-marketplace-enabled",
+      git:      "plugin-marketplace-git",
+      external: "plugin-marketplace-external"
     };
 
     function readNames(key) {
@@ -438,13 +489,43 @@
       return null;
     }
 
+    function readExternals() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.external);
+        if (raw) return JSON.parse(raw) || [];
+      } catch (e) {}
+      return [];
+    }
+
+    function externalKey(p) {
+      return `github:${p.repo}:${p.path || ""}`;
+    }
+
     function buildTree() {
       const enabled = readNames(STORAGE_KEYS.enabled);
       const git     = readNames(STORAGE_KEYS.git);
-      const isVisible = (p) =>
+      const externals = readExternals();
+
+      const builtinVisible = (p) =>
         (enabled === null || enabled.includes(p.name)) &&
         (git     === null || git.includes(p.name));
-      const filteredPlugins = PLUGIN_DIRS.filter(isVisible);
+      const externalVisible = (p) => {
+        const k = externalKey(p);
+        return enabled === null || enabled.includes(k);
+      };
+
+      const filteredBuiltins  = PLUGIN_DIRS.filter(builtinVisible);
+      const filteredExternals = externals
+        .filter(externalVisible)
+        .map(p => ({
+          name: p.name,
+          type: "external",
+          repo: p.repo,
+          path: p.path || "",
+          ref:  p.ref,
+          commit: p.commit,
+          url:  p.url
+        }));
 
       return [
         { name: ".claude-plugin", type: "dir", children: [
@@ -453,7 +534,7 @@
         { name: ".factory-plugin", type: "dir", children: [
           { name: "marketplace.json", type: "file", ext: "json" }
         ]},
-        { name: "plugins", type: "dir", children: filteredPlugins },
+        { name: "plugins", type: "dir", children: [...filteredBuiltins, ...filteredExternals] },
         { name: "Dockerfile", type: "file", ext: "" },
         { name: "Makefile", type: "file", ext: "" },
         { name: "admin.html", type: "file", ext: "html" },
@@ -464,10 +545,15 @@
       ];
     }
 
-    const TREE = buildTree();
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+      })[c]);
+    }
 
     function iconFor(node) {
       if (node.type === "dir") return "📁";
+      if (node.type === "external") return "🔗";
       const ext = node.ext || "";
       switch (ext) {
         case "md": return "📝";
@@ -481,6 +567,7 @@
 
     function iconClassFor(node) {
       if (node.type === "dir") return "folder-icon";
+      if (node.type === "external") return "external-icon";
       switch (node.ext) {
         case "md": return "markdown-icon";
         case "json": return "json-icon";
@@ -489,15 +576,16 @@
     }
 
     function countItems(tree) {
-      let dirs = 0, files = 0;
+      let dirs = 0, files = 0, externals = 0;
       function walk(nodes) {
         for (const n of nodes) {
           if (n.type === "dir") { dirs++; walk(n.children || []); }
+          else if (n.type === "external") externals++;
           else files++;
         }
       }
       walk(tree);
-      return { dirs, files };
+      return { dirs, files, externals };
     }
 
     function renderTree(nodes, level) {
@@ -508,10 +596,26 @@
             <div class="file-row folder" data-dir-id="${id}" onclick="toggleDir('${id}')">
               <span class="toggle-arrow">▶</span>
               <span class="file-icon ${iconClassFor(n)}">${iconFor(n)}</span>
-              <span class="file-name folder-name">${n.name}</span>
+              <span class="file-name folder-name">${escapeHtml(n.name)}</span>
             </div>
             <div class="file-children" id="${id}">
               ${renderTree(n.children || [], level + 1)}
+            </div>
+          `;
+        }
+        if (n.type === "external") {
+          const shortSha = (n.commit || "").slice(0, 7);
+          const repoPath = n.path ? `${n.repo}/${n.path}` : n.repo;
+          return `
+            <div class="file-row">
+              <span class="toggle-arrow" style="visibility:hidden">▶</span>
+              <span class="file-icon ${iconClassFor(n)}">${iconFor(n)}</span>
+              <span class="file-name">${escapeHtml(n.name)}</span>
+              <span class="badge-external">External</span>
+              <span class="ext-source">
+                <a href="${escapeHtml(n.url)}" target="_blank" rel="noopener" title="Open source on GitHub">${escapeHtml(repoPath)}</a>
+                <code title="Pinned commit">${escapeHtml(shortSha)}</code>
+              </span>
             </div>
           `;
         }
@@ -519,7 +623,7 @@
           <div class="file-row">
             <span class="toggle-arrow" style="visibility:hidden">▶</span>
             <span class="file-icon ${iconClassFor(n)}">${iconFor(n)}</span>
-            <span class="file-name">${n.name}</span>
+            <span class="file-name">${escapeHtml(n.name)}</span>
           </div>
         `;
       }).join("");
@@ -553,12 +657,30 @@
       });
     };
 
-    // Render
-    document.getElementById("file-list").innerHTML = renderTree(TREE, 0);
+    // Render the tree. Wrapped in a function so it can be re-invoked when
+    // localStorage changes (e.g., after adding an external plugin in
+    // admin.html in another tab, or returning to this tab).
+    function renderAll() {
+      const tree = buildTree();
+      document.getElementById("file-list").innerHTML = renderTree(tree, 0);
+      const { dirs, files, externals } = countItems(tree);
+      const extPart = externals ? ` · <strong>${externals}</strong> external` : "";
+      document.getElementById("repo-summary").innerHTML =
+        `<strong>${dirs}</strong> directories · <strong>${files}</strong> files${extPart}`;
+    }
 
-    const { dirs, files } = countItems(TREE);
-    document.getElementById("repo-summary").innerHTML =
-      `<strong>${dirs}</strong> directories · <strong>${files}</strong> files`;
+    renderAll();
+
+    // Re-render when admin changes the marketplace state. The 'storage' event
+    // fires for changes made in *other* tabs; we also re-render on focus so
+    // changes made in this tab via /admin (same-tab nav back) are picked up.
+    window.addEventListener("storage", (e) => {
+      if (!e.key || e.key.startsWith("plugin-marketplace-")) renderAll();
+    });
+    window.addEventListener("focus", renderAll);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) renderAll();
+    });
   </script>
 </body>
 </html>
